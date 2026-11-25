@@ -20,6 +20,10 @@ Thanks for wanting to help. This is a small tool, so contributing should feel sm
 
 Short, imperative, lowercase is fine: `add opus output for local audio`.
 
+## License of contributions
+
+By contributing you agree that your contribution is licensed under the project's license, [AGPL-3.0-or-later](LICENSE).
+
 ## Code of conduct
 
 This project follows the [Code of Conduct](CODE_OF_CONDUCT.md). Be kind in reviews; we review code like gardeners, not judges.

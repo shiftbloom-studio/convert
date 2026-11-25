@@ -97,5 +97,11 @@ Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE) © shiftbloom studio and contributors.
-Brand assets (the Bloom mark, wordmark and brand typefaces) are not covered by the MIT license; please don't use them for forks.
+Copyright © 2026 shiftbloom studio and contributors.
+
+convert is free software: you can redistribute it and/or modify it under the terms of the [GNU Affero General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (`AGPL-3.0-or-later`).
+
+If you run a modified version as a network service, the AGPL requires you to offer its source code to your users — the "Quellcode ansehen" link in the UI does this; point it at your fork.
+
+Third-party components keep their own licenses: ffmpeg.wasm (`@ffmpeg/core`, GPL-2.0-or-later including x264) is loaded at runtime from jsDelivr and is not part of this repository; the brand typefaces are served under their own licenses (ITF Free Font License, SIL OFL).
+Brand assets (the Bloom mark, wordmark and typefaces) are not covered by the AGPL; please don't use them for forks.

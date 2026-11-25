@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 shiftbloom studio and contributors
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import HTML from "./ui.html";
 import FFWORKER from "./ffworker.js.txt";
