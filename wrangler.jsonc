@@ -7,6 +7,10 @@
 
   // Serve on your own hostname by uncommenting (the zone must be on your Cloudflare account):
   // "routes": [{ "pattern": "convert.example.com", "custom_domain": true }],
+  // No workers.dev or preview URLs: they bypass the zone's WAF and rate limiting rules.
+  // Without a custom domain, set "workers_dev": true instead.
+  "workers_dev": false,
+  "preview_urls": false,
 
   "rules": [{ "type": "Text", "globs": ["**/*.html", "**/*.txt"], "fallthrough": true }],
   "triggers": { "crons": ["17 * * * *"] },
