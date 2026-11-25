@@ -1,0 +1,29 @@
+{
+  "name": "convert",
+  "version": "1.0.0",
+  "description": "Image, video and audio converter on Cloudflare Workers, Images, Stream, Media Transformations and Workflows, with local ffmpeg.wasm fallback.",
+  "scripts": {
+    "dev": "wrangler dev --remote",
+    "check": "node scripts/check.mjs",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute convert-db --remote --file schema.sql"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shiftbloom-studio/convert.git"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shiftbloom-studio/convert/issues"
+  },
+  "homepage": "https://convert.shiftbloom.studio",
+  "devDependencies": {
+    "wrangler": "^4.168.0"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  }
+}
