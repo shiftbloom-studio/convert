@@ -4,7 +4,7 @@
 
 Please **do not open a public issue** for security problems.
 
-Use GitHub's private vulnerability reporting ("Report a vulnerability" in the Security tab of this repository), or email **hello@shiftbloom.studio** with the subject `security: convert`.
+Use GitHub's private vulnerability reporting ("Report a vulnerability" in the Security tab of this repository), or email **safety@shiftbloom.studio** with the subject `security: convert`.
 
 Please include what you found, how to reproduce it and the impact you expect. We aim to reply within 7 days and will credit you in the fix unless you prefer otherwise.
 
