@@ -137,7 +137,17 @@ input[type=number]:hover,select:hover{border-color:var(--ink45)}
 .track .dot{position:absolute;top:3px;left:0;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--bloom);transform:scale(0);transition:left .4s var(--settle),transform .24s var(--ease)}
 .item.busy .track .dot,.item.done .track .dot{transform:scale(1)}
 .item.err .track .fill,.item.err .track .dot{background:var(--root)}
-.item .actions select{max-width:200px}
+.item select{display:none}
+.into{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:-4px}
+.into .label{margin-right:4px}
+.into .fix{margin-left:auto}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{appearance:none;border:0;background:var(--paper);box-shadow:inset 0 0 0 1px var(--line2);color:var(--ink);font:500 14px/1 var(--sans);padding:10px 15px;border-radius:999px;cursor:pointer;transition:box-shadow .24s var(--settle),background .24s var(--settle),color .24s var(--settle)}
+.chip:hover{box-shadow:inset 0 0 0 1px var(--ink45)}
+.chip[aria-checked=true]{background:var(--blush);color:var(--root);box-shadow:inset 0 0 0 1.5px var(--bloom)}
+.chip:focus-visible{outline:2px solid var(--bloom);outline-offset:2px}
+.item.busy .into{opacity:.5;pointer-events:none}
+.item.done .into{display:none}
 .x{appearance:none;background:none;border:0;color:var(--ink60);font-size:22px;line-height:1;padding:4px 8px;cursor:pointer;border-radius:8px}
 .x:hover{color:var(--ink)}
 
@@ -194,8 +204,12 @@ footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
   .thumb{width:44px;height:44px;border-radius:12px}
   .item{row-gap:10px}
   .item .thumb{align-self:start}
-  .item .actions{grid-column:2/-1;justify-content:flex-start}
-  .item .actions .x{margin-left:auto}
+  .item{grid-template-columns:44px minmax(0,1fr) auto}
+  .into{grid-column:1/-1;margin-top:0}
+  .into .label{width:100%}
+  .chip{padding:12px 16px;font-size:15px}
+  .item.done .actions{grid-column:2/-1;justify-content:flex-start}
+  .item.done .actions .x{margin-left:auto}
   .studio{display:none}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -226,6 +240,8 @@ footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
     <input type="file" id="file" multiple hidden accept="image/*,video/*,audio/*,.mkv,.mov,.heic,.heif">
   </div>
 
+  <div class="list" id="list"></div>
+
   <div class="bar" id="bar" hidden>
     <fieldset class="mode">
       <legend class="label">Where to convert</legend>
@@ -247,7 +263,6 @@ footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
     <div id="ts"></div>
   </div>
   <p class="quota" id="quota" hidden></p>
-  <div class="list" id="list"></div>
 
   __ARTICLE__
 
@@ -429,9 +444,40 @@ function fill(it) {
   const keep = prev && T[it.kind][m].find((o) => o[2] === prev);
   it.sel.value = keep ? keep[0] : defaultTarget(it, m);
   it.selMode = m;
+  renderChips(it);
+}
+// The format picker: one chip per target, backed by the hidden select.
+function renderChips(it) {
+  const box = $(".chips", it.el);
+  box.replaceChildren(...[...it.sel.options].map((o) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.setAttribute("role", "radio"); b.dataset.v = o.value; b.textContent = o.textContent;
+    b.onclick = () => pickChip(it, o.value);
+    return b;
+  }));
+  box.onkeydown = (e) => {
+    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    const opts = [...it.sel.options], i = opts.findIndex((o) => o.value === it.sel.value);
+    pickChip(it, opts[(i + d + opts.length) % opts.length].value);
+    $(`.chip[aria-checked=true]`, box).focus();
+  };
+  syncChips(it);
+}
+function pickChip(it, v) {
+  if (it.state === "busy" || it.state === "done" || it.sel.value === v) return;
+  it.sel.value = v; it.sel.dispatchEvent(new Event("change"));
+}
+function syncChips(it) {
+  for (const b of it.el.querySelectorAll(".chip")) {
+    const on = b.dataset.v === it.sel.value;
+    b.setAttribute("aria-checked", on); b.tabIndex = on ? 0 : -1;
+  }
 }
 function refresh(it) {
   if (it.state === "busy" || it.state === "done") return;
+  syncChips(it);
   const m = modeOf(it), c = check(it), tag = $(".tag", it.el);
   tag.className = "tag " + m; tag.textContent = m === "cloud" ? "cloudflare" : "browser";
   it.el.classList.toggle("blocked", !!(c && c.block));
@@ -468,15 +514,17 @@ function addFiles(files) {
     el.innerHTML = `<div class="thumb"></div>
       <div style="min-width:0"><div class="name"></div><div class="meta"><span class="num">${fmtSize(f.size)}</span><span class="tag"></span><span class="status" role="status"></span></div>
       <div class="track" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"></div><div class="dot"></div></div></div>
-      <div class="actions"><button class="btn ghost small fix" hidden></button><select aria-label="Target format"></select><button class="x" title="Remove" aria-label="Remove">×</button></div>`;
+      <div class="actions"><select aria-label="Target format"></select><button class="x" title="Remove" aria-label="Remove">×</button></div>
+      <div class="into"><span class="label">Turn it into</span><div class="chips" role="radiogroup"></div><button class="btn ghost small fix" hidden></button></div>`;
     $(".name", el).textContent = f.name;
+    $(".chips", el).setAttribute("aria-label", "Turn " + f.name + " into");
     $(".thumb", el).textContent = ext(f.name).slice(0, 4) || "?";
     const it = { file: f, kind, ext: ext(f.name), mode: null, state: "idle", el, sel: $("select", el) };
     $(".x", el).onclick = () => { if (it.state === "busy") return; el.remove(); items.splice(items.indexOf(it), 1); updateBar(); };
     items.push(it);
     $("#list").append(el);
     if (!kind) {
-      it.state = "off"; el.classList.add("off"); it.sel.remove(); $(".tag", el).remove(); $(".track", el).remove();
+      it.state = "off"; el.classList.add("off"); it.sel.remove(); $(".into", el).remove(); $(".tag", el).remove(); $(".track", el).remove();
       setStatus(it, "convert can't open this kind of file.");
       continue;
     }
@@ -489,9 +537,9 @@ function addFiles(files) {
     if (kind === "video") readDuration(it);
   }
   updateBar(); loadQuota();
-  // On small screens the list sits far below the drop zone, so bring the new rows into view.
-  const bar = $("#bar"), r = bar.getBoundingClientRect();
-  if (files.length && r.top > innerHeight - 80) bar.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  // Bring the first new row, and with it the format picker, into view when it lands below the fold.
+  const first = items[items.length - files.length];
+  if (first && first.el.getBoundingClientRect().bottom > innerHeight - 40) first.el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
 }
 
 function updateBar() {
@@ -514,7 +562,7 @@ async function loadQuota() {
   updateBar();
 }
 
-const actionsOf = (it) => [$(".fix", it.el), it.sel, $(".x", it.el)];
+const actionsOf = (it) => [it.sel, $(".x", it.el)];
 function fail(it, e, m) {
   it.state = "error"; it.el.classList.remove("busy"); it.el.classList.add("err"); it.sel.disabled = false;
   setP(it, 1); setStatus(it, e.message || String(e), e.detail || "");
@@ -530,7 +578,7 @@ function finish(it, href, name, size, note) {
   if (size && !note) $(".num", it.el).textContent = fmtSize(it.file.size) + " → " + fmtSize(size);
   const a = document.createElement("a"); a.className = "btn primary small dl"; a.href = href; a.download = name; a.textContent = "Download";
   const again = document.createElement("button"); again.className = "btn ghost small"; again.textContent = "Another format";
-  again.onclick = () => { it.state = "idle"; it.el.classList.remove("done"); $(".actions", it.el).replaceChildren(...actionsOf(it)); it.sel.disabled = false; setP(it, 0); refresh(it); it.sel.focus(); };
+  again.onclick = () => { it.state = "idle"; it.el.classList.remove("done"); $(".actions", it.el).replaceChildren(...actionsOf(it)); it.sel.disabled = false; setP(it, 0); refresh(it); const c = $(".chip[aria-checked=true]", it.el); if (c) c.focus(); };
   $(".actions", it.el).replaceChildren(again, a, $(".x", it.el));
   updateBar(); scatter(a);
 }
