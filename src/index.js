@@ -602,7 +602,16 @@ function sitemap(origin) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>\n`;
 }
 
-const robots = (origin) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${origin}/sitemap.xml\n`;
+// Search and AI answer engines are welcome; AI training crawlers are not
+// (they are also blocked by a WAF rule at the edge).
+const AI_TRAINING_CRAWLERS = [
+  "GPTBot", "ClaudeBot", "anthropic-ai", "CCBot", "Google-Extended", "Applebot-Extended",
+  "Bytespider", "Amazonbot", "meta-externalagent", "cohere-ai", "MistralAI-Training", "Diffbot",
+];
+const robots = (origin) =>
+  "User-agent: *\nContent-Signal: search=yes, ai-input=yes, ai-train=no\nAllow: /\nDisallow: /api/\n\n" +
+  AI_TRAINING_CRAWLERS.map((bot) => `User-agent: ${bot}`).join("\n") +
+  `\nDisallow: /\n\nSitemap: ${origin}/sitemap.xml\n`;
 
 const llms = (origin, env) => `# convert.
 
