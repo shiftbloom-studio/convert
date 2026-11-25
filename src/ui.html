@@ -192,7 +192,10 @@ footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
   .mode{grid-template-columns:1fr}
   .item{grid-template-columns:44px minmax(0,1fr)}
   .thumb{width:44px;height:44px;border-radius:12px}
-  .item .actions{grid-column:1/-1}
+  .item{row-gap:10px}
+  .item .thumb{align-self:start}
+  .item .actions{grid-column:2/-1;justify-content:flex-start}
+  .item .actions .x{margin-left:auto}
   .studio{display:none}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -475,6 +478,9 @@ function addFiles(files) {
     if (kind === "video") readDuration(it);
   }
   updateBar(); loadQuota();
+  // On small screens the list sits far below the drop zone, so bring the new rows into view.
+  const bar = $("#bar"), r = bar.getBoundingClientRect();
+  if (files.length && r.top > innerHeight - 80) bar.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
 function updateBar() {
