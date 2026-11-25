@@ -16,7 +16,7 @@ The UI is in German; contributions for other languages are welcome.
 ## How it works
 
 ```
-browser ──▶ Worker (src/index.js)
+browser ──▶ Worker (src/index.ts)
              ├─ GET  /                     UI (src/ui.html), fonts proxied via /fonts.css
              ├─ POST /api/image ───────────▶ Images binding ─▶ response (nothing stored)
              ├─ POST /api/jobs ────────────▶ Turnstile + rate limit + daily quotas, then:
