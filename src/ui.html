@@ -30,12 +30,12 @@ a:hover{text-decoration:underline;text-underline-offset:3px}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 .top{display:flex;justify-content:space-between;align-items:center;padding:22px clamp(20px,5vw,56px);border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none!important}
-.brand .mark{width:28px;height:28px}
-.brand b{font:600 22px/1 var(--display);letter-spacing:-.02em}
+.brand{display:flex;align-items:center;gap:12px;color:var(--ink);text-decoration:none!important}
+.brand .mark{width:30px;height:30px}.brand .mark svg{display:block;width:100%;height:100%}
+.brand b{font:600 22.4px/1 var(--display);letter-spacing:-.02em}
 .seed{color:var(--bloom)}
 .studio{font:600 15px/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none!important}
-.studio span{font-weight:400;color:var(--ink60)}
+.studio span{font-weight:400;color:var(--ink60)}.studio .seed{color:var(--bloom)}
 
 main{max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,56px)}
 .hero{position:relative;display:grid;grid-template-columns:1.15fr .85fr;align-items:center;gap:32px;padding:clamp(40px,7vw,88px) 0 clamp(28px,4vw,48px)}
@@ -45,7 +45,7 @@ main{max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,56px)}
 .flower{position:relative;justify-self:center;width:min(360px,80%);aspect-ratio:1}
 .flower svg{width:100%;height:100%;display:block;overflow:visible}
 .flower .wrap{width:100%;height:100%;transform-origin:50% 50%;animation:unfurl .6s var(--ease) both,breathe 6s ease-in-out .6s infinite}
-.flower .ring{transform-origin:0 0;transform-box:view-box}
+.flower .ring{transform-origin:100px 100px;transform-box:view-box}
 body.busy .flower .r0{animation:spin 60s linear infinite}
 body.busy .flower .r1{animation:spin 48s linear infinite reverse}
 body.busy .flower .r2{animation:spin 36s linear infinite}
@@ -223,31 +223,32 @@ const MB = 1024 * 1024;
 const fmtSize = (b) => b >= MB ? (b / MB).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
 const ext = (n) => (n.split(".").pop() || "").toLowerCase();
 
-// ---- The Bloom, drawn from the brand spec (rings 3 + seed, petals 10·10·8·6).
+// ---- The Bloom: the exact mark from shiftbloom.studio (four petal rings + seed, 10·10·8·6).
+// Gradient from 32px up, solid Bloom Red below. Rings are grouped (.ring.r0 … .r3) for motion.
 function bloom(id, solid) {
   const rings = [
-    { r: 100, n: 10, w: 0.27, a: "#D8163F", b: "#FF2E52", rot: 0 },
-    { r: 74, n: 10, w: 0.29, a: "#FF2E52", b: "#FF7E9E", rot: 18 },
-    { r: 50, n: 8, w: 0.33, a: "#FF7E9E", b: "#FFC2D3", rot: 22.5 },
-    { r: 27, n: 6, w: 0.4, a: "#FFB4CA", b: "#FFDCE7", rot: 0 },
+    { r: 100, n: 10, w: 32, l: 90, a: "#D8163F", b: "#FF2E52", rot: 0 },
+    { r: 74, n: 10, w: 25.16, l: 66.6, a: "#FF2E52", b: "#FF7E9E", rot: 18 },
+    { r: 50, n: 8, w: 19, l: 45, a: "#FF7E9E", b: "#FFC2D3", rot: 40.5 },
+    { r: 27, n: 6, w: 12.96, l: 24.3, a: "#FFB4CA", b: "#FFDCE7", rot: 70.5 },
   ];
-  const petal = (r, w) => { const a = (w * r).toFixed(1), b = (w * r * 0.55).toFixed(1), y1 = (-r * 0.32).toFixed(1), y2 = (-r * 0.78).toFixed(1); return `M0 0C${a} ${y1} ${b} ${y2} 0 ${-r}C${-b} ${y2} ${-a} ${y1} 0 0Z`; };
+  const f = (v) => +v.toFixed(2);
   let defs = "", body = "";
   rings.forEach((g, i) => {
-    if (solid && i > 1) return;
-    const fill = solid ? "#FF2E52" : `url(#${id}g${i})`;
-    if (!solid) defs += `<linearGradient id="${id}g${i}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${g.a}"/><stop offset="1" stop-color="${g.b}"/></linearGradient>`;
+    const c = f(0.55 * g.l), d = `M 0,0 C ${g.w},0 ${g.w},${-c} 0,${-g.l} C ${-g.w},${-c} ${-g.w},0 0,0 Z`;
+    const fill = solid ? "#FF2E52" : `url(#${id}-${g.r})`;
+    if (!solid) defs += `<linearGradient id="${id}-${g.r}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${-g.l}"><stop offset="0%" stop-color="${g.a}"/><stop offset="100%" stop-color="${g.b}"/></linearGradient>`;
     let ps = "";
-    for (let k = 0; k < g.n; k++) ps += `<path d="${petal(g.r, g.w)}" transform="rotate(${(g.rot + (360 / g.n) * k).toFixed(1)})" fill="${fill}"/>`;
+    for (let k = 0; k < g.n; k++) ps += `<path d="${d}" fill="${fill}" transform="translate(100 100) rotate(${f(g.rot + (360 / g.n) * k)}) translate(0 ${-f(g.r - g.l)})"/>`;
     body += `<g class="ring r${i}">${ps}</g>`;
   });
-  body += `<circle r="7" fill="${solid ? "#C81040" : "#FF2E52"}"/>`;
-  return `<svg viewBox="-105 -105 210 210" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>${defs}</defs>${body}</svg>`;
+  body += `<circle cx="100" cy="100" r="7" fill="#FF2E52"/>`;
+  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${defs ? `<defs>${defs}</defs>` : ""}${body}</svg>`;
 }
 const SPARK = (s, c) => `<svg width="${s}" height="${s}" viewBox="-10 -10 20 20"><path d="M0-10C1-2 2-1 10 0 2 1 1 2 0 10-1 2-2 1-10 0-2-1-1-2 0-10Z" fill="${c}"/></svg>`;
 const CROSS = (s, c) => `<svg width="${s}" height="${s}" viewBox="-5 -5 10 10"><path d="M-1.4-5h2.8v3.6H5v2.8H1.4V5h-2.8V1.4H-5v-2.8h3.6z" fill="${c}"/></svg>`;
 const DOT = (s, c) => `<svg width="${s}" height="${s}" viewBox="-5 -5 10 10"><circle r="5" fill="${c}"/></svg>`;
-$("#mark").innerHTML = bloom("m", true);
+$("#mark").innerHTML = bloom("m", false);
 $("#flower").innerHTML = `<div class="wrap">${bloom("h", false)}</div>`;
 // Sprinkles in the margins of the hero: four of the allowed seven.
 [["-6%", "8%", SPARK(22, "#FF2E52")], ["92%", "2%", CROSS(12, "#1A1216")], ["98%", "70%", DOT(7, "#FF2E52")], ["4%", "92%", SPARK(14, "#1A1216")]]
