@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "convert",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+
+  // Serve on your own hostname by uncommenting (the zone must be on your Cloudflare account):
+  // "routes": [{ "pattern": "convert.example.com", "custom_domain": true }],
+
+  "rules": [{ "type": "Text", "globs": ["**/*.html", "**/*.txt"], "fallthrough": true }],
+  "triggers": { "crons": ["17 * * * *"] },
+
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "convert-files" }],
+  // Create with `npx wrangler d1 create convert-db` and paste the returned id here.
+  "d1_databases": [{ "binding": "DB", "database_name": "convert-db", "database_id": "00000000-0000-0000-0000-000000000000" }],
+  "images": { "binding": "IMAGES" },
+  "media": { "binding": "MEDIA" },
+  "stream": { "binding": "STREAM" },
+  "workflows": [{ "binding": "CONVERT_JOB", "name": "convert-job", "class_name": "ConvertJob" }],
+  "ratelimits": [
+    { "name": "IMG_LIMIT", "namespace_id": "4101", "simple": { "limit": 30, "period": 60 } },
+    { "name": "JOB_LIMIT", "namespace_id": "4102", "simple": { "limit": 5, "period": 60 } }
+  ],
+
+  "vars": {
+    // Turnstile test key (always passes). Replace with your own widget's site key.
+    "TURNSTILE_SITEKEY": "1x00000000000000000000AA",
+    "IMAGE_DAILY_PER_IP": "300",
+    "IMAGE_DAILY_GLOBAL": "2000",
+    "JOB_DAILY_PER_IP": "15",
+    "JOB_DAILY_GLOBAL": "200"
+  }
+  // Secret: TURNSTILE_SECRET -> `npx wrangler secret put TURNSTILE_SECRET` (locally: .dev.vars)
+}

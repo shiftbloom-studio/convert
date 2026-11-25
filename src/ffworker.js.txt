@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 shiftbloom studio and contributors
+// Classic worker that runs ffmpeg.wasm (single-threaded core) fully in the browser.
+const CORE = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js";
+const WASM = CORE.replace(/\.js$/, ".wasm");
+let ff = null;
+let duration = 0;
+
+async function load() {
+  if (ff) return ff;
+  importScripts(CORE);
+  ff = await self.createFFmpegCore({ mainScriptUrlOrBlob: CORE + "#" + btoa(JSON.stringify({ wasmURL: WASM })) });
+  ff.setLogger(({ message }) => {
+    const m = /Duration: (\d+):(\d+):(\d+\.\d+)/.exec(message || "");
+    if (m) duration = +m[1] * 3600 + +m[2] * 60 + +m[3];
+    self.postMessage({ type: "log", message });
+  });
+  ff.setProgress(({ progress, time }) => {
+    // time is in microseconds of output; fall back to ffmpeg's own estimate.
+    let p = duration > 0 && time > 0 ? time / 1e6 / duration : progress;
+    if (!(p >= 0 && p <= 1)) p = 0;
+    self.postMessage({ type: "progress", progress: p });
+  });
+  return ff;
+}
+
+self.onmessage = async ({ data }) => {
+  const { id, file, args, outName } = data;
+  try {
+    self.postMessage({ id, type: "status", status: "Lade ffmpeg (einmalig ~30 MB)…" });
+    const core = await load();
+    duration = 0;
+    const inName = "in_" + (file.name || "input").replace(/[^\w.]+/g, "_");
+    core.FS.writeFile(inName, new Uint8Array(await file.arrayBuffer()));
+    self.postMessage({ id, type: "status", status: "Konvertiere lokal…" });
+    core.exec("-i", inName, ...args, outName);
+    const ret = core.ret;
+    core.reset();
+    core.FS.unlink(inName);
+    if (ret !== 0) throw new Error("ffmpeg Fehlercode " + ret);
+    const out = core.FS.readFile(outName);
+    core.FS.unlink(outName);
+    self.postMessage({ id, type: "done", data: out.buffer }, [out.buffer]);
+  } catch (e) {
+    self.postMessage({ id, type: "error", error: String(e && e.message ? e.message : e) });
+  }
+};

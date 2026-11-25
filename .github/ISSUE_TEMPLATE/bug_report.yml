@@ -1,0 +1,28 @@
+name: Bug report
+description: Something doesn't convert, or converts wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: formats
+    attributes:
+      label: Input and target format
+      placeholder: "e.g. MOV (85 MB) → MP4 · cloud"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: "e.g. Firefox 133 on macOS 15"
+  - type: textarea
+    id: details
+    attributes:
+      label: Error message or console output
+      render: text
