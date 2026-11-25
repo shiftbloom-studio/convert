@@ -47,11 +47,11 @@ a:hover{text-decoration:underline;text-underline-offset:3px}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 .top{display:flex;justify-content:space-between;align-items:center;padding:22px clamp(20px,5vw,56px);border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none!important}
-.brand .mark{width:28px;height:28px}
+.brand{display:flex;align-items:center;gap:12px;color:var(--ink);text-decoration:none!important}
+.brand .mark{width:30px;height:30px}
 .brand .mark svg{display:block;width:100%;height:100%}
 body.busy .brand .mark svg{animation:spin 9s linear infinite}
-.brand b{font:600 22px/1 var(--display);letter-spacing:-.02em}
+.brand b{font:600 22.4px/1 var(--display);letter-spacing:-.02em}
 .seed{color:var(--bloom)}
 .studio{font:600 15px/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none!important}
 .studio span{font-weight:400;color:var(--ink60)}
@@ -308,18 +308,29 @@ const ext = (n) => (n.includes(".") ? n.split(".").pop() : "").toLowerCase();
 const isMp4 = (f) => f.type === "video/mp4" || /\.(mp4|m4v)$/i.test(f.name);
 const E = (msg, detail) => Object.assign(new Error(msg), { detail });
 
-// ---- The Bloom (solid variant for small sizes) and the sprinkles, from the brand spec.
-function bloom() {
-  const petal = (r, w) => { const a = (w * r).toFixed(1), b = (w * r * 0.55).toFixed(1), y1 = (-r * 0.32).toFixed(1), y2 = (-r * 0.78).toFixed(1); return `M0 0C${a} ${y1} ${b} ${y2} 0 ${-r}C${-b} ${y2} ${-a} ${y1} 0 0Z`; };
-  let body = "";
-  for (const [r, n, w, rot] of [[100, 10, 0.27, 0], [74, 10, 0.29, 18]])
-    for (let k = 0; k < n; k++) body += `<path d="${petal(r, w)}" transform="rotate(${(rot + (360 / n) * k).toFixed(1)})" fill="#FF2E52"/>`;
-  return `<svg viewBox="-105 -105 210 210" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}<circle r="7" fill="#C81040"/></svg>`;
+// ---- The Bloom: the exact mark from shiftbloom.studio (four petal rings + seed, 10·10·8·6),
+// gradient from 32px up, solid Bloom Red below. Plus the sprinkles, from the brand spec.
+function bloom(id, solid) {
+  const rings = [
+    { r: 100, n: 10, w: 32, l: 90, a: "#D8163F", b: "#FF2E52", rot: 0 },
+    { r: 74, n: 10, w: 25.16, l: 66.6, a: "#FF2E52", b: "#FF7E9E", rot: 18 },
+    { r: 50, n: 8, w: 19, l: 45, a: "#FF7E9E", b: "#FFC2D3", rot: 40.5 },
+    { r: 27, n: 6, w: 12.96, l: 24.3, a: "#FFB4CA", b: "#FFDCE7", rot: 70.5 },
+  ];
+  const f = (v) => +v.toFixed(2);
+  let defs = "", body = "";
+  for (const g of rings) {
+    const c = f(0.55 * g.l), d = `M 0,0 C ${g.w},0 ${g.w},${-c} 0,${-g.l} C ${-g.w},${-c} ${-g.w},0 0,0 Z`;
+    const fill = solid ? "#FF2E52" : `url(#${id}-${g.r})`;
+    if (!solid) defs += `<linearGradient id="${id}-${g.r}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${-g.l}"><stop offset="0%" stop-color="${g.a}"/><stop offset="100%" stop-color="${g.b}"/></linearGradient>`;
+    for (let k = 0; k < g.n; k++) body += `<path d="${d}" fill="${fill}" transform="translate(100 100) rotate(${f(g.rot + (360 / g.n) * k)}) translate(0 ${-f(g.r - g.l)})"/>`;
+  }
+  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${defs ? `<defs>${defs}</defs>` : ""}${body}<circle cx="100" cy="100" r="7" fill="#FF2E52"/></svg>`;
 }
 const SPARK = (s, c) => `<svg width="${s}" height="${s}" viewBox="-10 -10 20 20"><path d="M0-10C1-2 2-1 10 0 2 1 1 2 0 10-1 2-2 1-10 0-2-1-1-2 0-10Z" fill="${c}"/></svg>`;
 const CROSS = (s, c) => `<svg width="${s}" height="${s}" viewBox="-5 -5 10 10"><path d="M-1.4-5h2.8v3.6H5v2.8H1.4V5h-2.8V1.4H-5v-2.8h3.6z" fill="${c}"/></svg>`;
 const DOT = (s, c) => `<svg width="${s}" height="${s}" viewBox="-5 -5 10 10"><circle r="5" fill="${c}"/></svg>`;
-$("#mark").innerHTML = bloom();
+$("#mark").innerHTML = bloom("sb-bloom-ring", false);
 const sample = $(".sample");
 if (sample) [["-14px", "-12px", SPARK(20, "#FF2E52")], ["calc(100% - 4px)", "18%", CROSS(11, "#1A1216")], ["88%", "calc(100% + 6px)", DOT(7, "#FF2E52")]]
   .forEach(([l, t, s]) => { const d = document.createElement("span"); d.className = "spr"; d.style.left = l; d.style.top = t; d.innerHTML = s; sample.append(d); });

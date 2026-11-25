@@ -2,6 +2,7 @@
 // Copyright (C) 2026 shiftbloom studio and contributors
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import HTML from "./ui.html";
+import { faviconSvg } from "./bloom.js";
 import FFWORKER from "./ffworker.js.txt";
 import OG from "./og.png";
 import { HOME, FAQ, PAGES, REPO } from "./pages.js";
@@ -466,20 +467,14 @@ async function vendor(file) {
   });
 }
 
-// Solid Bloom (brand spec: < 32px uses the solid variant, outer two rings + root-red seed).
-const FAVICON = (() => {
-  const petal = (r, w) => { const a = w * r, b = w * r * 0.55, y1 = -r * 0.32, y2 = -r * 0.78; return `M0 0C${a} ${y1} ${b} ${y2} 0 ${-r}C${-b} ${y2} ${-a} ${y1} 0 0Z`; };
-  let body = "";
-  for (const [r, n, w, rot] of [[100, 10, 0.27, 0], [74, 10, 0.29, 18]])
-    for (let k = 0; k < n; k++) body += `<path d="${petal(r, w)}" transform="rotate(${rot + (360 / n) * k})" fill="#FF2E52"/>`;
-  return `<svg viewBox="-105 -105 210 210" xmlns="http://www.w3.org/2000/svg">${body}<circle r="7" fill="#C81040"/></svg>`;
-})();
+// Favicon: the solid bloom from shiftbloom.studio (brand spec: < 32px uses the solid variant).
+const FAVICON = faviconSvg();
 
 // Brand fonts (Clash Display, General Sans, JetBrains Mono) are proxied through this
 // Worker, so visitors never connect to Fontshare or Google directly.
 const FONT_CSS = [
   // Fontshare returns only the first family per request, so one URL per family.
-  "https://api.fontshare.com/v2/css?f[]=clash-display@600&display=swap",
+  "https://api.fontshare.com/v2/css?f[]=clash-display@400,600&display=swap",
   "https://api.fontshare.com/v2/css?f[]=general-sans@400,500&display=swap",
   "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap",
 ];
@@ -488,7 +483,7 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 
 async function fontCss(ctx) {
   const cache = caches.default;
-  const key = new Request("https://convert.internal/fonts.css?v=2");
+  const key = new Request("https://convert.internal/fonts.css?v=3");
   let res = await cache.match(key);
   if (res) return res;
   const parts = await Promise.all(FONT_CSS.map((u) => fetch(u, { headers: { "user-agent": UA } }).then((r) => (r.ok ? r.text() : ""))));
