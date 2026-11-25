@@ -1,9 +1,9 @@
 # convert.
 
 A small, open file converter for images, video and audio, running on Cloudflare.
-Live at **[convert.shiftbloom.studio](https://convert.shiftbloom.studio)** — free, no account, results deleted after 24 hours.
+Live at **[convert.shiftbloom.studio](https://convert.shiftbloom.studio)** - free, no account, results deleted after 24 hours.
 
-Drop files, pick a target format, download. Every format is labelled either **cloud** (converted on Cloudflare) or **local** (converted in your browser with ffmpeg.wasm — nothing is uploaded).
+Drop files, pick a target format, download. Every format is labelled either **cloud** (converted on Cloudflare) or **local** (converted in your browser with ffmpeg.wasm - nothing is uploaded).
 
 | Input | Cloud | Local |
 | --- | --- | --- |
@@ -72,7 +72,7 @@ npm run deploy
 ```
 
 To use your own domain, uncomment `routes` in `wrangler.jsonc`.
-Rate-limit `namespace_id`s must be unique per account — change them if they collide with another Worker.
+Rate-limit `namespace_id`s must be unique per account - change them if they collide with another Worker.
 
 ### Local development
 
@@ -93,7 +93,7 @@ npm run build                    # wrangler dry run into dist/
 
 ## Contributing
 
-Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately, see [SECURITY.md](SECURITY.md).
+Issues and pull requests are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately, see [SECURITY.md](SECURITY.md).
 
 ## License
 
@@ -101,7 +101,7 @@ Copyright © 2026 shiftbloom studio and contributors.
 
 convert is free software: you can redistribute it and/or modify it under the terms of the [GNU Affero General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (`AGPL-3.0-or-later`).
 
-If you run a modified version as a network service, the AGPL requires you to offer its source code to your users — the "Quellcode ansehen" link in the UI does this; point it at your fork.
+If you run a modified version as a network service, the AGPL requires you to offer its source code to your users - the "Quellcode ansehen" link in the UI does this; point it at your fork.
 
 Third-party components keep their own licenses: ffmpeg.wasm (`@ffmpeg/core`, GPL-2.0-or-later including x264) is loaded at runtime from jsDelivr and is not part of this repository; the brand typefaces are served under their own licenses (ITF Free Font License, SIL OFL).
 Brand assets (the Bloom mark, wordmark and typefaces) are not covered by the AGPL; please don't use them for forks.
