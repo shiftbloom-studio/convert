@@ -293,8 +293,50 @@ const CSP = [
   "img-src 'self' blob: data:",
   "media-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
   "frame-src https://challenges.cloudflare.com",
 ].join("; ");
+
+// Solid Bloom (brand spec: < 32px uses the solid variant, outer two rings + root-red seed).
+const FAVICON = (() => {
+  const petal = (r, w) => { const a = w * r, b = w * r * 0.55, y1 = -r * 0.32, y2 = -r * 0.78; return `M0 0C${a} ${y1} ${b} ${y2} 0 ${-r}C${-b} ${y2} ${-a} ${y1} 0 0Z`; };
+  let body = "";
+  for (const [r, n, w, rot] of [[100, 10, 0.27, 0], [74, 10, 0.29, 18]])
+    for (let k = 0; k < n; k++) body += `<path d="${petal(r, w)}" transform="rotate(${rot + (360 / n) * k})" fill="#FF2E52"/>`;
+  return `<svg viewBox="-105 -105 210 210" xmlns="http://www.w3.org/2000/svg">${body}<circle r="7" fill="#C81040"/></svg>`;
+})();
+
+// Brand fonts (Clash Display, General Sans, JetBrains Mono) are proxied through this
+// Worker, so visitors never connect to Fontshare or Google directly.
+const FONT_CSS = [
+  // Fontshare returns only the first family per request, so one URL per family.
+  "https://api.fontshare.com/v2/css?f[]=clash-display@600&display=swap",
+  "https://api.fontshare.com/v2/css?f[]=general-sans@400,500&display=swap",
+  "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap",
+];
+const FONT_HOSTS = { fs: "https://cdn.fontshare.com/", gs: "https://fonts.gstatic.com/" };
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
+
+async function fontCss(ctx) {
+  const cache = caches.default;
+  const key = new Request("https://convert.internal/fonts.css?v=2");
+  let res = await cache.match(key);
+  if (res) return res;
+  const parts = await Promise.all(FONT_CSS.map((u) => fetch(u, { headers: { "user-agent": UA } }).then((r) => (r.ok ? r.text() : ""))));
+  const css = parts.join("\n").replace(/url\((['"]?)(?:https?:)?\/\/(cdn\.fontshare\.com|fonts\.gstatic\.com)\/([^'")]+)\1\)/g,
+    (_, q, host, path) => `url(/fonts/${host.startsWith("cdn") ? "fs" : "gs"}/${path})`);
+  res = new Response(css, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=86400" } });
+  if (css.length > 100) ctx.waitUntil(cache.put(key, res.clone()));
+  return res;
+}
+
+async function fontFile(kind, path) {
+  const base = FONT_HOSTS[kind];
+  if (!base || path.includes("..")) return err("Not found", 404);
+  const r = await fetch(base + path, { headers: { "user-agent": UA }, cf: { cacheEverything: true, cacheTtl: 2592000 } });
+  if (!r.ok) return err("Not found", 404);
+  return new Response(r.body, { headers: { "content-type": r.headers.get("content-type") || "font/woff2", "cache-control": "public, max-age=31536000, immutable", "access-control-allow-origin": "*" } });
+}
 
 async function route(req, env, ctx) {
   const url = new URL(req.url);
@@ -308,6 +350,11 @@ async function route(req, env, ctx) {
   }
   if (m === "GET" && p === "/ffworker.js")
     return new Response(FFWORKER, { headers: { "content-type": "text/javascript", "cache-control": "public, max-age=3600" } });
+  if (m === "GET" && (p === "/favicon.svg" || p === "/favicon.ico"))
+    return new Response(FAVICON, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=604800" } });
+  if (m === "GET" && p === "/fonts.css") return fontCss(ctx);
+  const fm = m === "GET" && p.match(/^\/fonts\/(fs|gs)\/(.+)$/);
+  if (fm) return fontFile(fm[1], fm[2]);
   if (m === "GET" && p === "/api/health") return json({ ok: true });
   if (m === "POST" && p === "/api/image") return handleImage(req, env, url);
   if (m === "POST" && p === "/api/jobs") return createJob(req, env);
