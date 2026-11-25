@@ -7,7 +7,7 @@ export const REPO = "https://github.com/shiftbloom-studio/convert";
 
 export const HOME = {
   slug: "",
-  title: "HEIC to JPG, MOV to MP4 and more · convert.",
+  title: "Free file converter for images, video and audio · convert.",
   desc: "Turn HEIC photos into JPGs and MOV clips into MP4s. Images and video go through Cloudflare and are deleted after 24 hours. Everything else is converted inside your browser and never uploaded.",
   h1: "Your phone shot it in HEIC. The form wants a JPG.",
   lead: "Drop the file here and pick a format. Images up to 20 MB and videos up to 200 MB are converted on Cloudflare and deleted after a day. GIFs, WebM and audio are made by ffmpeg inside this tab, so those files never get uploaded.",

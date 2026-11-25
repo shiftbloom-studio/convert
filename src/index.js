@@ -529,7 +529,7 @@ function app(origin) {
     featureList: PAGES.map((p) => p.link).concat(["Still frames from video", "Remove audio from video"]),
     license: "https://www.gnu.org/licenses/agpl-3.0.html",
     sameAs: [REPO],
-    publisher: { "@id": "https://shiftbloom.studio/#org" },
+    publisher: { "@type": "Organization", "@id": "https://shiftbloom.studio/#org", name: "shiftbloom studio", url: "https://shiftbloom.studio" },
   };
 }
 
@@ -549,12 +549,13 @@ function renderPage(page, env, origin) {
         { "@type": "HowToStep", name: "Convert and download", text: "Press Convert, wait for the progress line to fill and download the result." },
       ],
     });
-  } else {
-    graph.push({
-      "@type": "FAQPage",
-      mainEntity: FAQ.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: faqText(a, env) } })),
-    });
   }
+  // Every page shows the FAQ block, so every page describes it.
+  graph.push({
+    "@type": "FAQPage",
+    "@id": url + "#faq",
+    mainEntity: FAQ.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: faqText(a, env) } })),
+  });
   const ex = p.example;
   const example = `<div class="sample" aria-hidden="true"><div class="row"><div class="thumb">${esc(ex.name.split(".").pop().slice(0, 4))}</div><div style="min-width:0">
       <div class="name">${esc(ex.name)} <span>→</span> .${esc(ex.to)}</div>
