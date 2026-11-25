@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>convert · shiftbloom studio</title>
+<meta name="description" content="Bilder und Videos schnell konvertieren: PNG, JPG, WebP, AVIF, MP4, WebM, GIF, MP3. Auf Cloudflare oder komplett lokal im Browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff6a3d'/%3E%3Cpath d='M9 12h11l-3-3M23 20H12l3 3' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<style>
+:root{--bg:#0d0d10;--panel:#16161b;--panel2:#1d1d24;--line:#2a2a33;--text:#ececf1;--muted:#9a9aa8;--accent:#ff6a3d;--accent2:#ffb03d;--ok:#3ddc97;--bad:#ff5470;--r:14px}
+@media (prefers-color-scheme:light){:root{--bg:#f6f5f2;--panel:#fff;--panel2:#f1f0ec;--line:#e3e1da;--text:#16161b;--muted:#6b6b76}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:inherit}
+.wrap{max-width:880px;margin:0 auto;padding:32px 20px 64px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;letter-spacing:-.02em}
+.logo i{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-style:normal;color:#fff;font-size:16px}
+.by{color:var(--muted);font-size:13px;text-decoration:none}
+h1{font-size:clamp(28px,5vw,42px);line-height:1.1;letter-spacing:-.03em;margin:0 0 10px}
+h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--muted);margin:0 0 24px;max-width:620px}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);background:var(--panel);padding:40px 20px;text-align:center;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--panel2)}
+.drop b{display:block;font-size:17px;margin-bottom:4px}
+.drop small{color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:14px}
+.chip{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:22px 0 12px}
+.opts{display:flex;flex-wrap:wrap;gap:14px;align-items:center;color:var(--muted);font-size:13px}
+.opts label{display:flex;gap:6px;align-items:center}
+input[type=number]{width:84px}
+input,select,button{font:inherit;color:var(--text)}
+select,input[type=number]{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:6px 8px}
+button{border:0;border-radius:10px;padding:9px 16px;font-weight:600;cursor:pointer;background:var(--panel2);border:1px solid var(--line)}
+button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:0}
+button:disabled{opacity:.5;cursor:default}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{display:grid;grid-template-columns:52px 1fr auto;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.thumb{width:52px;height:52px;border-radius:10px;background:var(--panel2);object-fit:cover;display:grid;place-items:center;font-size:11px;color:var(--muted);overflow:hidden;text-transform:uppercase;font-weight:700}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{color:var(--muted);font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.prog{height:6px;border-radius:9px;background:var(--panel2);overflow:hidden;margin-top:7px}
+.prog div{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
+.item.done .prog div{background:var(--ok)}
+.item.err .prog div{background:var(--bad)}
+.item.err .status{color:var(--bad)}
+.actions{display:flex;gap:8px;align-items:center}
+.actions select{max-width:170px}
+.tag{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;letter-spacing:.03em}
+.tag.cloud{background:rgba(255,106,61,.15);color:var(--accent)}
+.tag.local{background:rgba(61,220,151,.15);color:var(--ok)}
+a.dl{background:var(--ok);color:#06140d;text-decoration:none;padding:8px 14px;border-radius:10px;font-weight:700;font-size:14px}
+.x{background:none;border:0;color:var(--muted);padding:6px;font-size:18px;line-height:1}
+.info{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:36px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;font-size:13.5px;color:var(--muted)}
+.card b{color:var(--text);display:block;margin-bottom:4px;font-size:14.5px}
+#ts{margin-top:14px;min-height:0}
+footer{margin-top:40px;color:var(--muted);font-size:12.5px;text-align:center}
+@media (max-width:620px){.item{grid-template-columns:44px 1fr}.thumb{width:44px;height:44px}.actions{grid-column:1/-1;justify-content:flex-end}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><i>⇄</i>convert</div>
+    <a class="by" href="https://shiftbloom.studio" target="_blank" rel="noopener">by shiftbloom studio</a>
+  </header>
+  <h1>Dateien umwandeln, <span>ohne Umwege.</span></h1>
+  <p class="lead">Bilder und Videos per Drag &amp; Drop konvertieren. <b>Cloud</b>-Formate laufen auf Cloudflares Edge, <b>Lokal</b>-Formate komplett in deinem Browser, ohne Upload. Ergebnisse werden nach 24&nbsp;Stunden gelöscht.</p>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Dateien auswählen">
+    <b>Dateien hierher ziehen oder klicken</b>
+    <small>Bilder bis 25 MB · Videos bis 200 MB in der Cloud, größere lokal</small>
+    <div class="chips"><span class="chip">PNG</span><span class="chip">JPG</span><span class="chip">WebP</span><span class="chip">AVIF</span><span class="chip">GIF</span><span class="chip">MP4</span><span class="chip">MOV</span><span class="chip">WebM</span><span class="chip">MKV</span><span class="chip">MP3</span><span class="chip">WAV</span></div>
+    <input type="file" id="file" multiple hidden accept="image/*,video/*,audio/*,.mkv,.mov">
+  </div>
+
+  <div class="bar" id="bar" hidden>
+    <div class="opts">
+      <label>Qualität <input type="number" id="quality" min="1" max="100" value="85"></label>
+      <label>Max. Breite <input type="number" id="width" min="0" max="12000" placeholder="original"></label>
+      <label><input type="checkbox" id="mute"> Ton entfernen</label>
+    </div>
+    <div class="actions">
+      <button id="clear">Leeren</button>
+      <button class="primary" id="go">Alle konvertieren</button>
+    </div>
+  </div>
+  <div class="list" id="list"></div>
+  <div id="ts"></div>
+
+  <div class="info">
+    <div class="card"><b>Bilder · Cloud</b>PNG, JPG, WebP, AVIF über Cloudflare Images. Optional verkleinern und Qualität wählen.</div>
+    <div class="card"><b>Videos · Cloud</b>MP4 (H.264), M4A-Audio und Standbilder über Cloudflare Stream und Media Transformations.</div>
+    <div class="card"><b>Lokal · privat</b>WebM, GIF, MP3, WAV, OGG und MP4 für große Dateien mit ffmpeg.wasm direkt im Browser.</div>
+  </div>
+  <footer>Fair use: Tageslimits pro Nutzer. · <a href="https://github.com/shiftbloom-studio/convert" target="_blank" rel="noopener">Quellcode</a></footer>
+</div>
+<script>
+const SITEKEY = "__SITEKEY__";
+const $ = (s) => document.querySelector(s);
+const MB = 1024 * 1024;
+const fmtSize = (b) => b >= MB ? (b / MB).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+const ext = (n) => (n.split(".").pop() || "").toLowerCase();
+
+const T = {
+  image: [
+    ["webp", "WebP", "cloud"], ["avif", "AVIF", "cloud"], ["png", "PNG", "cloud"], ["jpeg", "JPG", "cloud"],
+  ],
+  video: [
+    ["mp4", "MP4 (H.264)", "cloud"], ["m4a", "M4A Audio", "cloud"], ["jpg", "Standbild JPG", "cloud"], ["png", "Standbild PNG", "cloud"],
+    ["webm", "WebM", "local"], ["gif", "GIF", "local"], ["mp3", "MP3 Audio", "local"], ["mp4l", "MP4", "local"],
+  ],
+  audio: [["mp3", "MP3", "local"], ["wav", "WAV", "local"], ["ogg", "OGG", "local"], ["m4al", "M4A", "local"]],
+};
+const LOCAL = {
+  webm: { ext: "webm", type: "video/webm", args: (o) => [...(o.width ? ["-vf", `scale='min(${o.width},iw)':-2`] : []), "-c:v", "libvpx", "-b:v", "1.5M", "-deadline", "realtime", "-cpu-used", "8", ...(o.mute ? ["-an"] : ["-c:a", "libvorbis"])] },
+  gif: { ext: "gif", type: "image/gif", args: (o) => ["-vf", `fps=12,scale='min(${o.width || 480},iw)':-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse`, "-loop", "0"] },
+  mp3: { ext: "mp3", type: "audio/mpeg", args: () => ["-vn", "-c:a", "libmp3lame", "-q:a", "2"] },
+  wav: { ext: "wav", type: "audio/wav", args: () => ["-vn"] },
+  ogg: { ext: "ogg", type: "audio/ogg", args: () => ["-vn", "-c:a", "libvorbis", "-q:a", "5"] },
+  m4al: { ext: "m4a", type: "audio/mp4", args: () => ["-vn", "-c:a", "aac", "-b:a", "192k"] },
+  mp4l: { ext: "mp4", type: "video/mp4", args: (o) => [...(o.width ? ["-vf", `scale='min(${o.width},iw)':-2`] : []), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", ...(o.mute ? ["-an"] : ["-c:a", "aac"])] },
+};
+
+const items = [];
+const kindOf = (f) => {
+  const t = f.type || "";
+  if (t.startsWith("image/") || ["png","jpg","jpeg","webp","avif","gif","bmp","tif","tiff","heic"].includes(ext(f.name))) return "image";
+  if (t.startsWith("video/") || ["mp4","mov","m4v","webm","mkv","avi"].includes(ext(f.name))) return "video";
+  if (t.startsWith("audio/") || ["mp3","wav","ogg","flac","m4a","aac","opus"].includes(ext(f.name))) return "audio";
+  return null;
+};
+
+function addFiles(files) {
+  for (const f of files) {
+    const kind = kindOf(f);
+    if (!kind) continue;
+    const it = { file: f, kind, state: "idle" };
+    const el = document.createElement("div");
+    el.className = "item";
+    const opts = T[kind].map(([v, l, w]) => `<option value="${v}" data-where="${w}">${l} · ${w === "cloud" ? "Cloud" : "Lokal"}</option>`).join("");
+    el.innerHTML = `<div class="thumb">${ext(f.name).slice(0, 4)}</div>
+      <div style="min-width:0"><div class="name"></div><div class="meta"><span>${fmtSize(f.size)}</span><span class="tag"></span><span class="status">Bereit</span></div><div class="prog"><div></div></div></div>
+      <div class="actions"><select aria-label="Zielformat">${opts}</select><button class="x" title="Entfernen">×</button></div>`;
+    el.querySelector(".name").textContent = f.name;
+    if (kind === "image" && f.size < 15 * MB) {
+      const img = new Image(); img.src = URL.createObjectURL(f); img.alt = "";
+      el.querySelector(".thumb").replaceChildren(img);
+    }
+    const sel = el.querySelector("select");
+    if (kind === "image" && ext(f.name) === "webp") sel.value = "png";
+    if (kind === "video" && f.size > 200 * MB) sel.value = "mp4l";
+    const tag = () => { const w = sel.selectedOptions[0].dataset.where; const t = el.querySelector(".tag"); t.className = "tag " + w; t.textContent = w === "cloud" ? "CLOUD" : "LOKAL"; };
+    sel.onchange = tag; tag();
+    el.querySelector(".x").onclick = () => { if (it.state === "busy") return; el.remove(); items.splice(items.indexOf(it), 1); $("#bar").hidden = !items.length; };
+    it.el = el; it.sel = sel;
+    items.push(it);
+    $("#list").append(el);
+  }
+  $("#bar").hidden = !items.length;
+}
+
+const setP = (it, p, status) => {
+  it.el.querySelector(".prog div").style.width = Math.round(Math.max(0, Math.min(1, p)) * 100) + "%";
+  if (status) it.el.querySelector(".status").textContent = status;
+};
+const fail = (it, msg) => { it.state = "error"; it.el.classList.add("err"); setP(it, 1, msg); };
+const finish = (it, href, name, size) => {
+  it.state = "done"; it.el.classList.add("done"); setP(it, 1, "Fertig" + (size ? " · " + fmtSize(size) : ""));
+  const a = document.createElement("a"); a.className = "dl"; a.href = href; a.download = name; a.textContent = "Download";
+  it.el.querySelector(".actions").replaceChildren(a);
+};
+const options = () => ({ quality: +$("#quality").value || 85, width: +$("#width").value || 0, mute: $("#mute").checked });
+
+function xhr(method, url, body, onProgress, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open(method, url);
+    for (const [k, v] of Object.entries(headers)) x.setRequestHeader(k, v);
+    x.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    x.onload = () => resolve(x);
+    x.onerror = () => reject(new Error("Netzwerkfehler beim Upload"));
+    x.send(body);
+  });
+}
+
+async function convertImage(it, fmt) {
+  const o = options();
+  const q = new URLSearchParams({ format: fmt, quality: o.quality, name: it.file.name });
+  if (o.width) q.set("width", o.width);
+  const x = new XMLHttpRequest();
+  x.open("POST", "/api/image?" + q);
+  x.responseType = "blob";
+  x.upload.onprogress = (e) => e.lengthComputable && setP(it, (e.loaded / e.total) * 0.7, "Upload " + Math.round((e.loaded / e.total) * 100) + " %");
+  x.upload.onload = () => setP(it, 0.8, "Konvertiere…");
+  await new Promise((res, rej) => { x.onload = res; x.onerror = () => rej(new Error("Netzwerkfehler")); x.send(it.file); });
+  if (x.status !== 200) { const j = JSON.parse(await x.response.text().catch(() => "{}") || "{}"); throw new Error(j.error || "Fehler " + x.status); }
+  const name = it.file.name.replace(/\.[^.]+$/, "") + "." + (fmt === "jpeg" ? "jpg" : fmt);
+  finish(it, URL.createObjectURL(x.response), name, x.response.size);
+}
+
+// Turnstile: one fresh token per cloud video job.
+let tsWidget = null, tsWaiters = [];
+function turnstileToken() {
+  return new Promise((resolve, reject) => {
+    const start = () => {
+      tsWaiters.push(resolve);
+      if (tsWidget === null) {
+        tsWidget = turnstile.render("#ts", { sitekey: SITEKEY, theme: "auto", size: "flexible", appearance: "interaction-only",
+          callback: (t) => { const w = tsWaiters.shift(); w && w(t); },
+          "error-callback": () => reject(new Error("Bot-Check fehlgeschlagen")) });
+      } else turnstile.reset(tsWidget);
+    };
+    if (window.turnstile) start(); else { let n = 0; const iv = setInterval(() => { if (window.turnstile) { clearInterval(iv); start(); } else if (++n > 100) { clearInterval(iv); reject(new Error("Turnstile nicht geladen")); } }, 100); }
+  });
+}
+let tsChain = Promise.resolve();
+const serialToken = () => (tsChain = tsChain.then(turnstileToken, turnstileToken));
+
+async function convertVideoCloud(it, target) {
+  const o = options();
+  setP(it, 0.01, "Prüfe…");
+  const token = await serialToken();
+  const r = await fetch("/api/jobs", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: it.file.name, size: it.file.size, type: it.file.type, target, width: o.width, mute: o.mute, turnstile: token }) });
+  const job = await r.json();
+  if (!r.ok) throw new Error(job.error || "Fehler " + r.status);
+  const up = job.upload;
+  const onUp = (p) => setP(it, p * 0.4, "Upload " + Math.round(p * 100) + " %");
+  let res;
+  if (up.method === "PUT") res = await xhr("PUT", up.url, it.file, onUp, { "content-type": it.file.type || "video/mp4" });
+  else { const fd = new FormData(); fd.append(up.field, it.file); res = await xhr("POST", up.url, fd, onUp); }
+  if (res.status >= 300) throw new Error("Upload fehlgeschlagen (" + res.status + ")");
+  if (up.then) { const s = await fetch(up.then, { method: "POST" }); if (!s.ok) throw new Error("Start fehlgeschlagen"); }
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const s = await (await fetch("/api/jobs/" + job.id)).json();
+    if (s.status === "error") throw new Error(s.error || "Fehler");
+    setP(it, 0.4 + (s.progress / 100) * 0.6, (s.step || s.status) + " · " + s.progress + " %");
+    if (s.status === "done") return finish(it, s.download, s.outputName, s.outputSize);
+  }
+}
+
+let ffw = null, ffq = Promise.resolve();
+function convertLocal(it, target) {
+  const spec = LOCAL[target];
+  const run = () => new Promise((resolve, reject) => {
+    ffw = ffw || new Worker("/ffworker.js");
+    const outName = "out." + spec.ext;
+    ffw.onmessage = ({ data }) => {
+      if (data.type === "status") setP(it, 0.02, data.status);
+      else if (data.type === "progress") setP(it, data.progress, "Lokal · " + Math.round(data.progress * 100) + " %");
+      else if (data.type === "done") {
+        const blob = new Blob([data.data], { type: spec.type });
+        finish(it, URL.createObjectURL(blob), it.file.name.replace(/\.[^.]+$/, "") + "." + spec.ext, blob.size); resolve();
+      } else if (data.type === "error") { reject(new Error(data.error)); }
+    };
+    ffw.onerror = (e) => { ffw = null; reject(new Error(e.message || "Worker-Fehler (zu wenig Speicher?)")); };
+    ffw.postMessage({ id: 1, file: it.file, args: spec.args(options()), outName });
+  });
+  return (ffq = ffq.then(run, run)); // ffmpeg.wasm runs one job at a time
+}
+
+async function convert(it) {
+  if (it.state === "busy" || it.state === "done") return;
+  it.state = "busy"; it.el.classList.remove("err"); it.sel.disabled = true;
+  const target = it.sel.value, where = it.sel.selectedOptions[0].dataset.where;
+  try {
+    if (where === "local") await convertLocal(it, target);
+    else if (it.kind === "image") await convertImage(it, target);
+    else await convertVideoCloud(it, target);
+  } catch (e) { fail(it, e.message || String(e)); it.sel.disabled = false; }
+}
+
+$("#go").onclick = async () => {
+  const todo = items.filter((i) => i.state !== "done" && i.state !== "busy");
+  const pool = 3; let idx = 0;
+  await Promise.all(Array.from({ length: pool }, async () => { while (idx < todo.length) await convert(todo[idx++]); }));
+};
+$("#clear").onclick = () => { for (const it of [...items]) if (it.state !== "busy") { it.el.remove(); items.splice(items.indexOf(it), 1); } $("#bar").hidden = !items.length; };
+const drop = $("#drop"), input = $("#file");
+drop.onclick = () => input.click();
+drop.onkeydown = (e) => (e.key === "Enter" || e.key === " ") && input.click();
+input.onchange = () => { addFiles(input.files); input.value = ""; };
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); };
+document.addEventListener("paste", (e) => addFiles([...e.clipboardData.files]));
+</script>
+</body>
+</html>
