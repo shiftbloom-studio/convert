@@ -145,7 +145,7 @@ export function legalPage(slug, env, origin) {
 <title>${esc(p.title)} · convert.</title><meta name="robots" content="noindex">
 <link rel="canonical" href="${esc(origin + "/" + slug)}"><link rel="alternate" hreflang="${p.lang === "de" ? "en" : "de"}" href="${esc(origin + "/" + p.other)}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/fonts.css">
-<style>body{margin:0;font:16px/1.65 "General Sans",system-ui,sans-serif;color:#1A1216;background:#fff;padding:clamp(28px,6vw,72px) clamp(20px,5vw,56px)}
+<style>body{margin:0;font:16px/1.65 "General Sans",system-ui,sans-serif;color:#1A1216;background:#F6F1EE;padding:clamp(28px,6vw,72px) clamp(20px,5vw,56px)}
 main{max-width:720px;margin:0 auto}h1{font:600 clamp(32px,6vw,52px)/1.05 "Clash Display",system-ui,sans-serif;letter-spacing:-.03em;margin:18px 0 10px}h1 span{color:#FF2E52}
 h2{font:600 22px/1.2 "Clash Display",system-ui,sans-serif;letter-spacing:-.01em;margin:40px 0 10px}address{font-style:normal;margin:0 0 1em}
 .top{display:flex;align-items:center;justify-content:space-between;gap:16px}.top img{width:40px;height:40px;display:block}

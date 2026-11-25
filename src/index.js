@@ -581,7 +581,7 @@ function renderPage(page, env, origin) {
 const NOT_FOUND = (origin) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Not found · convert.</title><meta name="robots" content="noindex"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/fonts.css">
-<style>body{margin:0;font:16px/1.65 "General Sans",system-ui,sans-serif;color:#1A1216;background:#fff;display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}
+<style>body{margin:0;font:16px/1.65 "General Sans",system-ui,sans-serif;color:#1A1216;background:#F6F1EE;display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}
 main{max-width:560px}h1{font:600 clamp(32px,6vw,52px)/1.05 "Clash Display",system-ui,sans-serif;letter-spacing:-.03em;margin:18px 0 20px}h1 span{color:#FF2E52}
 img{width:40px;height:40px}nav{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
 a{font:500 13px/1 "JetBrains Mono",ui-monospace,monospace;color:#1A1216;padding:10px 14px;border-radius:999px;box-shadow:inset 0 0 0 1px #E2D8D5;text-decoration:none}
