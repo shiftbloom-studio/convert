@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 shiftbloom studio and contributors
 // Classic worker that runs ffmpeg.wasm (single-threaded core) fully in the browser.
-const CORE = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js";
+// Served by our own Worker (a cached copy of @ffmpeg/core 0.12.10), so no third party sees the visitor.
+const CORE = self.location.origin + "/vendor/ffmpeg-core.js";
 const WASM = CORE.replace(/\.js$/, ".wasm");
 let ff = null;
 let duration = 0;
@@ -33,7 +34,8 @@ self.onmessage = async ({ data }) => {
     const inName = "in_" + (file.name || "input").replace(/[^\w.]+/g, "_");
     core.FS.writeFile(inName, new Uint8Array(await file.arrayBuffer()));
     self.postMessage({ id, type: "status", status: "Converting …" });
-    core.exec("-i", inName, ...args, outName);
+    // Drop metadata and chapters (location, device, names) from every result.
+    core.exec("-i", inName, "-map_metadata", "-1", "-map_chapters", "-1", ...args, outName);
     const ret = core.ret;
     core.reset();
     core.FS.unlink(inName);

@@ -13,6 +13,7 @@ const worker = readFileSync("src/index.js", "utf8")
 files.push(["worker.mjs", worker]);
 files.push(["ffworker.js", readFileSync("src/ffworker.js.txt", "utf8")]);
 files.push(["pages.mjs", readFileSync("src/pages.js", "utf8")]);
+files.push(["legal.mjs", readFileSync("src/legal.js", "utf8")]);
 const html = readFileSync("src/ui.html", "utf8");
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
 if (!scripts.length) throw new Error("no inline script found in ui.html");

@@ -17,7 +17,9 @@ Before converting, people choose where it happens. "On Cloudflare" is faster and
 ```
 browser ──▶ Worker (src/index.js)
              ├─ GET  /, /heic-to-jpg, …      pages (src/ui.html + src/pages.js), fonts proxied via /fonts.css
-             ├─ POST /api/image ───────────▶ Images binding ─▶ response (nothing stored)
+             ├─ GET  /privacy, /imprint, …    legal pages (src/legal.js), operator from LEGAL_* vars
+             ├─ POST /api/session ─────────▶ Turnstile ─▶ 20 minute key for images
+             ├─ POST /api/image ───────────▶ checks ─▶ Images binding ─▶ response (nothing stored)
              ├─ POST /api/jobs ────────────▶ Turnstile + rate limit + daily quotas, then:
              │    MP4 ≤ 100 MB   ─ PUT /api/jobs/:id/upload ─▶ R2 in/ ─┐
              │    other ≤ 200 MB ─ direct upload to Stream ─────────────┤
@@ -32,7 +34,17 @@ browser ──▶ Worker (src/index.js)
 
 Workers serve the HTTP API, the pages, the font proxy and an hourly cleanup cron. A Workflow drives each video job through its steps with retries. R2 holds inputs and results, and a lifecycle rule removes everything after one day. D1 keeps job state and the daily usage counters from `schema.sql`.
 
-Images uses the Images binding. MP4 inputs up to 100 MB take the fast path through Media Transformations. Every other video goes through Stream, and the Stream copy is deleted as soon as the result is in R2. Turnstile checks for a human before each video job, and per-IP rate limits protect both endpoints. Local conversions run ffmpeg.wasm in a web worker (`src/ffworker.js.txt`), with the core loaded from jsDelivr.
+Images uses the Images binding. MP4 inputs up to 100 MB take the fast path through Media Transformations. Every other video goes through Stream, and the Stream copy is deleted as soon as the result is in R2. Local conversions run ffmpeg.wasm in a web worker (`src/ffworker.js.txt`). The Worker serves the core under `/vendor/`, fetched once from jsDelivr and cached at the edge, and every local result is written without metadata or chapters.
+
+### Abuse and bad files
+
+- Turnstile runs before each video job and before an image session. The script only loads once someone converts on Cloudflare, and the Worker checks the token's hostname and action.
+- Every POST and PUT to the API must come from the page's own origin.
+- Images are read into memory (at most 20 MB) and must start with the magic bytes of PNG, JPEG, GIF, WebP, AVIF or HEIC. SVG is refused. Their dimensions are read before decoding, and anything over 50 megapixels or 12,000 pixels per side is refused.
+- MP4 uploads must start with an `ftyp` box that isn't an image brand, checked before a byte reaches R2. Uploads must come from the connection that created the job. Other videos go to Stream, which refuses anything it can't decode, with a 10 minute limit.
+- Results are always served as downloads with the target's type, `nosniff` and a sandbox CSP. Pages send `frame-ancestors 'none'`.
+- Rate limits and quotas key on an HMAC of the IP and the day, derived from the Turnstile secret. Workers rate limits cap each connection per minute, and D1 counters cap it per day.
+- The hourly cron deletes inputs older than 2 hours, results older than 23 hours, Stream copies, job rows after 2 days and counters after 7.
 
 ### Limits
 
@@ -84,7 +96,9 @@ convert has no accounts and sets no cookies. There is no analytics script.
 
 Uploaded videos and results stay in R2 for at most 24 hours. Images are converted in a single request and never stored. Stream copies are deleted as soon as the result is saved. Files converted in the browser are never uploaded.
 
-IP addresses are only used as a salted hash that changes every day, for rate limits and quotas. Fonts are proxied through the Worker, so visitors never connect to Google Fonts or Fontshare.
+IP addresses are only used as a keyed hash that changes every day, for rate limits and quotas. Fonts and the ffmpeg core are served by the Worker, so visitors never connect to Google Fonts, Fontshare or jsDelivr. Turnstile loads only when something is converted on Cloudflare.
+
+The privacy policy and imprint live in `src/legal.js`, in English and German, at `/privacy`, `/datenschutz`, `/imprint` and `/impressum`. The operator's name, address and contact come from the `LEGAL_*` variables in `wrangler.jsonc`, so set them for your own deployment and check that the text still matches what your copy does.
 
 ## Contributing
 
@@ -98,5 +112,5 @@ convert is free software: you can redistribute it and/or modify it under the ter
 
 If you run a modified version as a network service, the AGPL requires you to offer its source code to your users. The "Read the code" link in the UI does this, so point it at your fork.
 
-Third-party components keep their own licenses. ffmpeg.wasm (`@ffmpeg/core`, GPL-2.0-or-later including x264) is loaded at runtime from jsDelivr and is not part of this repository. The brand typefaces are served under their own licenses (ITF Free Font License, SIL OFL).
+Third-party components keep their own licenses. ffmpeg.wasm (`@ffmpeg/core`, GPL-2.0-or-later including x264) is fetched at runtime from jsDelivr, served by the Worker and is not part of this repository. The brand typefaces are served under their own licenses (ITF Free Font License, SIL OFL).
 Brand assets are not covered by the AGPL. That includes the Bloom mark, the wordmark, the typefaces and `src/og.png` with its source `assets/og.html`, so please don't use them for forks.

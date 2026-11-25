@@ -5,6 +5,7 @@ import HTML from "./ui.html";
 import FFWORKER from "./ffworker.js.txt";
 import OG from "./og.png";
 import { HOME, FAQ, PAGES, REPO } from "./pages.js";
+import { LEGAL, legalPage } from "./legal.js";
 
 const MB = 1024 * 1024;
 const LIMITS = {
@@ -13,6 +14,10 @@ const LIMITS = {
   streamBytes: 200 * MB, // Stream basic direct upload limit
   maxDurationSeconds: 600,
 };
+const IMAGE_PIXELS = 50e6; // decompression bombs: refuse anything larger before decoding it
+const IMAGE_SIDE = 12000;
+const SESSION_TTL = 20 * 60;
+const VIDEO_EXT = /\.(mp4|m4v|mov|qt|webm|mkv|avi|wmv|flv|3gp|3g2|mpe?g|ts|mts|m2ts|ogv|vob)$/i;
 const IMAGE_FORMATS = { png: "image/png", jpeg: "image/jpeg", webp: "image/webp", avif: "image/avif" };
 const VIDEO_TARGETS = {
   mp4: { mode: "video", ext: "mp4", type: "video/mp4" },
@@ -28,10 +33,44 @@ const now = () => Date.now();
 const QUOTA_MSG = "Cloudflare is done for today on this connection. Your browser can still convert files, or come back tomorrow.";
 const today = () => new Date().toISOString().slice(0, 10);
 
-async function ipHash(req) {
-  const ip = req.headers.get("cf-connecting-ip") || "unknown";
-  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip + ":" + today()));
-  return [...new Uint8Array(d)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
+const enc = (v) => new TextEncoder().encode(v);
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+const clientIp = (req) => req.headers.get("cf-connecting-ip") || "unknown";
+
+// HMAC keys are derived from the Turnstile secret, so a hashed IP can't be reversed by
+// hashing every address without it. One key per purpose.
+const hmacKeys = new Map();
+async function hmac(env, label, msg) {
+  const id = label + ":" + (env.TURNSTILE_SECRET || "dev");
+  if (!hmacKeys.has(id))
+    hmacKeys.set(id, crypto.subtle.digest("SHA-256", enc(id)).then((raw) => crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])));
+  return hex(await crypto.subtle.sign("HMAC", await hmacKeys.get(id), enc(msg)));
+}
+
+// Daily keyed hash of the connection: used for rate limits and quotas instead of the IP.
+async function ipHash(req, env) {
+  return (await hmac(env, "ip", clientIp(req) + ":" + today())).slice(0, 24);
+}
+
+// Browsers send Origin on every POST and PUT made by fetch or XHR. Anything else is a script.
+function sameOrigin(req, url) {
+  const o = req.headers.get("origin");
+  if (o) return o === url.origin;
+  return req.headers.get("sec-fetch-site") === "same-origin";
+}
+
+// Short-lived key for /api/image after one Turnstile check, bound to the connection.
+async function sessionToken(env, req, exp) {
+  return exp + "." + (await hmac(env, "session", clientIp(req) + ":" + exp)).slice(0, 32);
+}
+async function checkSession(req, env) {
+  const t = req.headers.get("x-convert-session") || "";
+  const exp = +t.split(".")[0];
+  const nowS = now() / 1000;
+  if (!(exp > nowS && exp <= nowS + SESSION_TTL + 60)) return false;
+  const want = enc(await sessionToken(env, req, exp));
+  const got = enc(t);
+  return want.byteLength === got.byteLength && crypto.subtle.timingSafeEqual(want, got);
 }
 
 // Daily quota counter in D1. Returns false when over limit.
@@ -42,16 +81,57 @@ async function takeQuota(env, subject, limit, units = 1) {
   return row.units <= limit;
 }
 
-async function verifyTurnstile(env, token, req) {
-  if (!token) return false;
+async function verifyTurnstile(env, token, req, url) {
+  if (typeof token !== "string" || !token || token.length > 2048) return false;
   const body = new FormData();
   body.append("secret", env.TURNSTILE_SECRET);
   body.append("response", token);
   body.append("remoteip", req.headers.get("cf-connecting-ip") || "");
   const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body });
-  const out = await r.json();
-  return !!out.success;
+  const out = await r.json().catch(() => ({}));
+  if (!out.success) return false;
+  // Test keys answer for any host and action; real widgets must match this site.
+  if (/^\dx0000/.test(env.TURNSTILE_SITEKEY || "")) return true;
+  return out.hostname === url.hostname && out.action === "convert";
 }
+
+// Magic bytes of the image formats Cloudflare Images reads. SVG and anything else is refused.
+const at = (b, off, str) => [...str].every((c, i) => b[off + i] === c.charCodeAt(0));
+const brand = (b) => (at(b, 4, "ftyp") ? String.fromCharCode(...b.subarray(8, 12)) : null);
+function sniffImage(b) {
+  if (b.length < 12) return null;
+  if (at(b, 0, "\x89PNG\r\n\x1a\n")) return "png";
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpeg";
+  if (at(b, 0, "GIF87a") || at(b, 0, "GIF89a")) return "gif";
+  if (at(b, 0, "RIFF") && at(b, 8, "WEBP")) return "webp";
+  const br = brand(b);
+  if (/^(avif|avis)$/.test(br)) return "avif";
+  if (/^(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(br)) return "heic";
+  return null;
+}
+// An MP4 starts with an ftyp box whose brand isn't one of the still-image brands.
+const isMp4Head = (b) => { const br = brand(b); return !!br && !/^(avif|avis|heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(br); };
+
+async function readLimited(body, max) {
+  if (!body) return new Uint8Array(0);
+  const reader = body.getReader();
+  const chunks = [];
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    n += value.byteLength;
+    if (n > max) { await reader.cancel().catch(() => {}); return null; }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(n);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+  return out;
+}
+
+// Results are only ever downloads: never rendered, sniffed or framed by the browser.
+const FILE_HEADERS = { "x-content-type-options": "nosniff", "content-security-policy": "sandbox; default-src 'none'", "cache-control": "private, no-store", "cross-origin-resource-policy": "same-origin" };
 
 const safeName = (name, ext) =>
   ((name || "file").replace(/\.[^.]+$/, "").replace(/[^\w.\- ]+/g, "_").slice(0, 80) || "file") + "." + ext;
@@ -203,44 +283,72 @@ export class ConvertJob extends WorkflowEntrypoint {
 }
 
 // ---------------------------------------------------------------- HTTP
+async function createSession(req, env, url) {
+  if (!sameOrigin(req, url)) return err("This only works from the convert page.", 403);
+  const ip = await ipHash(req, env);
+  const { success } = await env.IMG_LIMIT.limit({ key: "s:" + ip });
+  if (!success) return err("Too many requests. Wait a minute and try again.", 429);
+  const body = await req.json().catch(() => ({}));
+  if (!(await verifyTurnstile(env, body.turnstile, req, url))) return err("The bot check failed. Reload the page and try again.", 403);
+  const expires = Math.floor(now() / 1000) + SESSION_TTL;
+  return json({ token: await sessionToken(env, req, expires), expires }, 200, { "cache-control": "no-store" });
+}
+
 async function handleImage(req, env, url) {
-  const ip = await ipHash(req);
+  if (!sameOrigin(req, url)) return err("This only works from the convert page.", 403);
+  const ip = await ipHash(req, env);
   const { success } = await env.IMG_LIMIT.limit({ key: ip });
   if (!success) return err("Too many requests. Wait a minute and try again.", 429);
+  if (!(await checkSession(req, env))) return json({ error: "The bot check expired. Try again.", code: "session" }, 401);
   const format = url.searchParams.get("format");
   if (!IMAGE_FORMATS[format]) return err("Unknown target format.");
   const size = +req.headers.get("content-length") || 0;
   if (!size || size > LIMITS.imageBytes) return err(`This image is ${(size / MB).toFixed(1)} MB. Cloudflare takes up to 20 MB.`, 413);
+  const bytes = await readLimited(req.body, LIMITS.imageBytes);
+  if (!bytes) return err("This image is over 20 MB. Cloudflare takes up to 20 MB.", 413);
+  if (!sniffImage(bytes)) return err("This doesn't look like an image convert can read. Try PNG, JPG, WebP, GIF, AVIF or HEIC.", 415);
   if (!(await takeQuota(env, "img:" + ip, +env.IMAGE_DAILY_PER_IP))) return err(QUOTA_MSG, 429);
   if (!(await takeQuota(env, "img:global", +env.IMAGE_DAILY_GLOBAL))) return err(QUOTA_MSG, 429);
 
   const quality = Math.min(100, Math.max(1, +url.searchParams.get("quality") || 85));
   const width = +url.searchParams.get("width") || 0;
+  const stream = () => new Response(bytes).body;
+  let info;
   try {
-    let t = env.IMAGES.input(req.body);
-    if (width > 0) t = t.transform({ width: Math.min(width, 12000), fit: "scale-down" });
+    info = await env.IMAGES.info(stream());
+  } catch (e) {
+    return err("This image is damaged or not really an image.", 415, String(e.message || e));
+  }
+  if (!(info.width > 0 && info.height > 0)) return err("This image is damaged or not really an image.", 415);
+  if (info.width * info.height > IMAGE_PIXELS || info.width > IMAGE_SIDE || info.height > IMAGE_SIDE)
+    return err(`This image is ${info.width} × ${info.height} pixels. Cloudflare takes up to 50 megapixels and 12,000 pixels per side.`, 413);
+  try {
+    let t = env.IMAGES.input(stream());
+    if (width > 0) t = t.transform({ width: Math.min(width, IMAGE_SIDE), fit: "scale-down" });
     const out = await t.output({ format: IMAGE_FORMATS[format], quality, anim: format === "webp" ? undefined : false });
-    const name = safeName(url.searchParams.get("name"), format === "jpeg" ? "jpg" : format);
+    const name = "image." + (format === "jpeg" ? "jpg" : format);
     return out.response({
-      headers: { "content-disposition": `attachment; filename="${name}"`, "cache-control": "no-store" },
+      headers: { ...FILE_HEADERS, "content-type": IMAGE_FORMATS[format], "content-disposition": `attachment; filename="${name}"` },
     });
   } catch (e) {
     return err("Something went wrong. Try again in a moment.", 422, String(e.message || e));
   }
 }
 
-async function createJob(req, env) {
-  const ip = await ipHash(req);
+async function createJob(req, env, url) {
+  if (!sameOrigin(req, url)) return err("This only works from the convert page.", 403);
+  const ip = await ipHash(req, env);
   const { success } = await env.JOB_LIMIT.limit({ key: ip });
   if (!success) return err("Too many requests. Wait a minute and try again.", 429);
   const body = await req.json().catch(() => ({}));
   const { name, size, type, target, width, mute, time, turnstile } = body;
   if (!VIDEO_TARGETS[target]) return err("Unknown target format.");
   if (!(size > 0)) return err("The file is missing.");
-  if (!(await verifyTurnstile(env, turnstile, req))) return err("The bot check failed. Reload the page and try again.", 403);
+  if (!/^video\//.test(type || "") && !VIDEO_EXT.test(name || "")) return err("Cloudflare only takes videos here. Your browser can convert this file.", 415);
+  if (!(await verifyTurnstile(env, turnstile, req, url))) return err("The bot check failed. Reload the page and try again.", 403);
 
   // MOV usually carries HEVC, which only Stream reads reliably, so only real MP4 takes the fast path.
-  const isMp4 = /^video\/mp4$/.test(type || "") || /\.(mp4|m4v)$/i.test(name || "");
+  const isMp4 = /^video\/mp4$/.test(type || "") || (!type && /\.(mp4|m4v)$/i.test(name || ""));
   let engine;
   if (isMp4 && size <= LIMITS.mediaBytes) engine = "media";
   else if (size <= LIMITS.streamBytes && VIDEO_TARGETS[target].mode !== "frame") engine = "stream";
@@ -267,7 +375,7 @@ async function createJob(req, env) {
   }
   await env.DB.prepare(
     "INSERT INTO jobs (id, kind, engine, status, progress, step, input_name, input_key, stream_uid, options, ip_hash, created_at, updated_at) VALUES (?1, 'video', ?2, 'uploading', 0, 'Uploading', ?3, ?4, ?5, ?6, ?7, ?8, ?8)"
-  ).bind(id, engine, (name || "video").slice(0, 200), `in/${id}`, streamUid, options, ip, now()).run();
+  ).bind(id, engine, String(name || "video").slice(0, 200), `in/${id}`, streamUid, options, ip, now()).run();
   return json({ id, engine, upload });
 }
 
@@ -280,12 +388,41 @@ async function startWorkflow(env, id) {
   await env.CONVERT_JOB.create({ id, params: { id } });
 }
 
-async function handleUpload(req, env, id) {
+async function handleUpload(req, env, id, url) {
+  if (!sameOrigin(req, url)) return err("This only works from the convert page.", 403);
   const job = await getJob(env, id);
   if (!job || job.engine !== "media" || job.status !== "uploading") return err("Job not found.", 404);
+  if (job.ip_hash !== (await ipHash(req, env))) return err("Job not found.", 404);
   const size = +req.headers.get("content-length") || 0;
   if (!size || size > LIMITS.mediaBytes) return err("This file is too big for the fast path.", 413);
-  await env.FILES.put(`in/${id}`, req.body, { httpMetadata: { contentType: req.headers.get("content-type") || "video/mp4" } });
+  // Check the first bytes before anything reaches storage, then stream the rest through.
+  const reader = req.body.getReader();
+  let head = new Uint8Array(0);
+  while (head.byteLength < 12) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const next = new Uint8Array(head.byteLength + value.byteLength);
+    next.set(head);
+    next.set(value, head.byteLength);
+    head = next;
+  }
+  if (!isMp4Head(head)) {
+    await reader.cancel().catch(() => {});
+    await updateJob(env, id, { status: "error", error: "This file isn't an MP4.\nmagic bytes", step: "Failed" });
+    return err("This file isn't an MP4. Pick an in-browser format, or rename it to what it really is.", 415);
+  }
+  const { readable, writable } = new FixedLengthStream(size);
+  const pump = (async () => {
+    const w = writable.getWriter();
+    await w.write(head);
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      await w.write(value);
+    }
+    await w.close();
+  })();
+  await Promise.all([env.FILES.put(`in/${id}`, readable, { httpMetadata: { contentType: "video/mp4" } }), pump]);
   await startWorkflow(env, id);
   return json({ ok: true });
 }
@@ -300,15 +437,34 @@ function publicJob(job) {
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://cdn.jsdelivr.net blob:",
+  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com blob:",
   "worker-src 'self' blob:",
-  "connect-src 'self' https://cdn.jsdelivr.net https://*.videodelivery.net https://*.cloudflarestream.com blob: data:",
+  "connect-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com blob: data:",
   "img-src 'self' blob: data:",
   "media-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "frame-src https://challenges.cloudflare.com",
+  "frame-ancestors 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "object-src 'none'",
 ].join("; ");
+
+// ffmpeg.wasm core, fetched once from npm's CDN and served from here, so visitors never
+// connect to a third party. Pinned version; the cache keeps it at the edge.
+const FFMPEG_CORE = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/";
+async function vendor(file) {
+  const r = await fetch(FFMPEG_CORE + file, { cf: { cacheEverything: true, cacheTtl: 31536000 } });
+  if (!r.ok) return err("Not found", 404);
+  return new Response(r.body, {
+    headers: {
+      "content-type": file.endsWith(".wasm") ? "application/wasm" : "text/javascript; charset=utf-8",
+      "cache-control": "public, max-age=31536000, immutable",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
 
 // Solid Bloom (brand spec: < 32px uses the solid variant, outer two rings + root-red seed).
 const FAVICON = (() => {
@@ -481,7 +637,7 @@ The API serves the web app. Video jobs need a Cloudflare Turnstile token, so it 
 `;
 
 async function quota(req, env) {
-  const ip = await ipHash(req);
+  const ip = await ipHash(req, env);
   const { results } = await env.DB.prepare("SELECT subject, units FROM usage WHERE day = ?1 AND subject IN (?2, ?3, 'img:global', 'job:global')")
     .bind(today(), "img:" + ip, "job:" + ip).all();
   const used = Object.fromEntries(results.map((r) => [r.subject, r.units]));
@@ -507,6 +663,9 @@ async function route(req, env, ctx) {
   if (m === "GET" && p === "/llms.txt") return new Response(llms(origin, env), { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
   if (m === "GET" && p === "/og.png") return new Response(OG, { headers: { "content-type": "image/png", "cache-control": "public, max-age=604800" } });
   if (m === "GET" && p === "/api/quota") return quota(req, env);
+  if (m === "GET" && LEGAL[p.slice(1)])
+    return new Response(legalPage(p.slice(1), env, origin), { headers: { ...HTML_HEADERS, "cache-control": "public, max-age=3600" } });
+  if (m === "GET" && (p === "/vendor/ffmpeg-core.js" || p === "/vendor/ffmpeg-core.wasm")) return vendor(p.slice(8));
   if (m === "GET" && p === "/ffworker.js")
     return new Response(FFWORKER, { headers: { "content-type": "text/javascript", "cache-control": "public, max-age=3600" } });
   if (m === "GET" && (p === "/favicon.svg" || p === "/favicon.ico"))
@@ -515,16 +674,18 @@ async function route(req, env, ctx) {
   const fm = m === "GET" && p.match(/^\/fonts\/(fs|gs)\/(.+)$/);
   if (fm) return fontFile(fm[1], fm[2]);
   if (m === "GET" && p === "/api/health") return json({ ok: true });
+  if (m === "POST" && p === "/api/session") return createSession(req, env, url);
   if (m === "POST" && p === "/api/image") return handleImage(req, env, url);
-  if (m === "POST" && p === "/api/jobs") return createJob(req, env);
+  if (m === "POST" && p === "/api/jobs") return createJob(req, env, url);
 
   const jm = p.match(/^\/api\/jobs\/([0-9a-f-]{36})(\/(upload|start|download))?$/);
   if (jm) {
     const [, id, , action] = jm;
-    if (m === "PUT" && action === "upload") return handleUpload(req, env, id);
+    if (m === "PUT" && action === "upload") return handleUpload(req, env, id, url);
     const job = await getJob(env, id);
     if (!job) return err("Job not found.", 404);
     if (m === "POST" && action === "start") {
+      if (!sameOrigin(req, url) || job.ip_hash !== (await ipHash(req, env))) return err("Job not found.", 404);
       if (job.engine !== "stream" || job.status !== "uploading") return err("This job can't be started now.", 409);
       await startWorkflow(env, id);
       return json({ ok: true });
@@ -534,11 +695,14 @@ async function route(req, env, ctx) {
       if (job.status !== "done") return err("Not ready yet.", 409);
       const obj = await env.FILES.get(job.output_key);
       if (!obj) return err("This file has expired. Converted files are deleted after 24 hours.", 410);
-      const h = new Headers();
-      obj.writeHttpMetadata(h);
-      h.set("content-length", obj.size);
-      h.set("cache-control", "private, no-store");
-      return new Response(obj.body, { headers: h });
+      return new Response(obj.body, {
+        headers: {
+          ...FILE_HEADERS,
+          "content-type": job.output_type || "application/octet-stream",
+          "content-disposition": `attachment; filename="${safeName(job.output_name, (job.output_name || "").split(".").pop() || "bin")}"`,
+          "content-length": String(obj.size),
+        },
+      });
     }
   }
   if (p.startsWith("/api/")) return err("Not found.", 404);
@@ -554,12 +718,22 @@ export default {
       return err("Something went wrong. Try again in a moment.", 500);
     }
   },
-  // Safety net: remove leftover Stream videos and old job rows.
+  // Safety net: remove leftover uploads, Stream copies, results and old rows.
   async scheduled(event, env, ctx) {
-    const cutoff = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
-    const vids = await env.STREAM.videos.list({ before: cutoff, limit: 100 }).catch(() => []);
+    const t = Date.now();
+    const vids = await env.STREAM.videos.list({ before: new Date(t - 2 * 3600 * 1000).toISOString(), limit: 100 }).catch(() => []);
     for (const v of vids) if (v.creator === "convert") await env.STREAM.video(v.id).delete().catch(() => {});
-    await env.DB.prepare("DELETE FROM jobs WHERE created_at < ?1").bind(Date.now() - 2 * 86400 * 1000).run();
-    await env.DB.prepare("DELETE FROM usage WHERE day < ?1").bind(new Date(Date.now() - 7 * 86400 * 1000).toISOString().slice(0, 10)).run();
+    // Inputs whose job never ran: 2 hours. Results: 23 hours, so none outlives 24 with an hourly cron.
+    for (const [prefix, age] of [["in/", 2 * 3600 * 1000], ["out/", 23 * 3600 * 1000]]) {
+      let cursor;
+      do {
+        const list = await env.FILES.list({ prefix, cursor, limit: 500 });
+        const old = list.objects.filter((o) => t - o.uploaded.getTime() > age).map((o) => o.key);
+        if (old.length) await env.FILES.delete(old);
+        cursor = list.truncated ? list.cursor : undefined;
+      } while (cursor);
+    }
+    await env.DB.prepare("DELETE FROM jobs WHERE created_at < ?1").bind(t - 2 * 86400 * 1000).run();
+    await env.DB.prepare("DELETE FROM usage WHERE day < ?1").bind(new Date(t - 7 * 86400 * 1000).toISOString().slice(0, 10)).run();
   },
 };

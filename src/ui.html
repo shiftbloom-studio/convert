@@ -25,7 +25,6 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/fonts.css">
 <script type="application/ld+json">__JSONLD__</script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <style>
 :root{
   --bloom:#FF2E52;--root:#C81040;--petal:#FF8FAB;--blush:#FFE9EF;--ink:#1A1216;--paper:#FFFFFF;--warm:#FAF6F4;
@@ -175,6 +174,7 @@ footer{max-width:1080px;margin:72px auto 0;padding:22px clamp(20px,5vw,56px) 36p
 footer p{margin:0}
 footer a{color:var(--ink60)}
 footer a:hover{color:var(--root)}
+footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
 
 .pop{position:fixed;pointer-events:none;z-index:9;animation:pop .9s var(--ease) both}
 @keyframes pop{0%{transform:translate(0,0) scale(.2);opacity:0}30%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
@@ -291,6 +291,7 @@ footer a:hover{color:var(--root)}
 <footer>
   <p>Made by <a href="https://shiftbloom.studio" rel="noopener">shiftbloom studio</a> in Hamburg. every commit helps something bloom<span class="seed">.</span></p>
   <p>Converted files are deleted after 24 hours.</p>
+  <nav class="legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/datenschutz" hreflang="de" lang="de">Datenschutz</a><a href="/imprint">Imprint</a><a href="/impressum" hreflang="de" lang="de">Impressum</a></nav>
 </footer>
 
 <script>
@@ -533,28 +534,68 @@ function xhr(method, url, body, onProgress, headers = {}) {
 
 async function convertImage(it, fmt) {
   const o = options();
-  const q = new URLSearchParams({ format: fmt, quality: o.quality, name: it.file.name });
+  const q = new URLSearchParams({ format: fmt, quality: o.quality });
   if (o.width) q.set("width", o.width);
-  const x = new XMLHttpRequest();
-  x.open("POST", "/api/image?" + q);
-  x.responseType = "blob";
-  x.upload.onprogress = (e) => e.lengthComputable && setP(it, (e.loaded / e.total) * 0.7, "Uploading " + pct(e.loaded / e.total));
-  x.upload.onload = () => setP(it, 0.8, "Converting …");
-  await new Promise((res, rej) => { x.onload = res; x.onerror = () => rej(E("The upload dropped. Check your connection and try again.")); x.send(it.file); });
-  if (x.status !== 200) { let j = {}; try { j = JSON.parse(await x.response.text()); } catch {} throw E(j.error || "Something went wrong. Try again in a moment.", j.detail || "HTTP " + x.status); }
+  const send = async (fresh) => {
+    setP(it, 0.01, "Checking you're human …");
+    const token = await imageSession(fresh);
+    const x = new XMLHttpRequest();
+    x.open("POST", "/api/image?" + q);
+    x.setRequestHeader("x-convert-session", token);
+    x.responseType = "blob";
+    x.upload.onprogress = (e) => e.lengthComputable && setP(it, (e.loaded / e.total) * 0.7, "Uploading " + pct(e.loaded / e.total));
+    x.upload.onload = () => setP(it, 0.8, "Converting …");
+    await new Promise((res, rej) => { x.onload = res; x.onerror = () => rej(E("The upload dropped. Check your connection and try again.")); x.send(it.file); });
+    let j = {};
+    if (x.status !== 200) try { j = JSON.parse(await x.response.text()); } catch {}
+    return { x, j };
+  };
+  let { x, j } = await send(false);
+  if (x.status === 401 && j.code === "session") ({ x, j } = await send(true));
+  if (x.status !== 200) throw E(j.error || "Something went wrong. Try again in a moment.", j.detail || "HTTP " + x.status);
   const name = it.file.name.replace(/\.[^.]+$/, "") + "." + (fmt === "jpeg" ? "jpg" : fmt);
   finish(it, URL.createObjectURL(x.response), name, x.response.size);
 }
 
-// Turnstile: one fresh token per cloud video job. The widget sits in the options bar
+// Images ride on a short session: one bot check, then a key that is good for 20 minutes.
+let sess = null;
+function imageSession(fresh) {
+  if (fresh || !sess || (sess.exp && sess.exp < Date.now() / 1000 + 60)) {
+    const s = { exp: 0 };
+    s.p = serialToken().then(async (t) => {
+      const r = await fetch("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ turnstile: t }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw E(j.error || "The bot check failed. Reload the page and try again.", j.detail || "HTTP " + r.status);
+      s.exp = j.expires;
+      return j.token;
+    });
+    s.p.catch(() => { if (sess === s) sess = null; });
+    sess = s;
+  }
+  return sess.p;
+}
+
+// Turnstile loads only once something is converted on Cloudflare, never on page view.
+let tsLoad = null;
+const loadTurnstile = () => tsLoad || (tsLoad = new Promise((resolve, reject) => {
+  const sc = document.createElement("script");
+  sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+  sc.async = true;
+  sc.onload = resolve;
+  sc.onerror = () => { tsLoad = null; sc.remove(); reject(E("The bot check didn't load. An ad blocker might be blocking challenges.cloudflare.com.")); };
+  document.head.appendChild(sc);
+}));
+
+// Turnstile: one fresh token per cloud video job or image session. The widget sits in the options bar
 // and only shows up when Cloudflare wants an interaction.
 let tsWidget = null, tsWaiters = [], tsReject = null;
-function turnstileToken() {
+async function turnstileToken() {
+  await loadTurnstile();
   return new Promise((resolve, reject) => {
     const start = () => {
       tsWaiters.push(resolve); tsReject = reject;
       if (tsWidget === null) {
-        tsWidget = turnstile.render("#ts", { sitekey: SITEKEY, theme: "light", size: "flexible", appearance: "interaction-only",
+        tsWidget = turnstile.render("#ts", { sitekey: SITEKEY, action: "convert", theme: "light", size: "flexible", appearance: "interaction-only",
           callback: (t) => { const w = tsWaiters.shift(); w && w(t); },
           "before-interactive-callback": () => $("#ts").scrollIntoView({ block: "center", behavior: "smooth" }),
           "error-callback": () => tsReject && tsReject(E("The bot check failed. Reload the page and try again.")) });
