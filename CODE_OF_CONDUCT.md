@@ -4,4 +4,4 @@ This project adopts the [Contributor Covenant, version 2.1](https://www.contribu
 
 In short: be welcoming, be patient, assume good intent, and keep criticism about the code, not the person. Harassment of any kind is not tolerated.
 
-Report unacceptable behaviour to **hello@shiftbloom.studio**. All reports are handled confidentially.
+Report unacceptable behaviour to **safety@shiftbloom.studio**. All reports are handled confidentially.
