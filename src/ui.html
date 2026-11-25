@@ -138,6 +138,7 @@ input[type=number]:hover,select:hover{border-color:var(--ink45)}
 .item.busy .track .dot,.item.done .track .dot{transform:scale(1)}
 .item.err .track .fill,.item.err .track .dot{background:var(--root)}
 .item select{display:none}
+.item .actions{grid-column:3;grid-row:1}
 .into{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:-4px}
 .into .label{margin-right:4px}
 .into .fix{margin-left:auto}
@@ -208,7 +209,7 @@ footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
   .into{grid-column:1/-1;margin-top:0}
   .into .label{width:100%}
   .chip{padding:12px 16px;font-size:15px}
-  .item.done .actions{grid-column:2/-1;justify-content:flex-start}
+  .item.done .actions{grid-column:2/-1;grid-row:2;justify-content:flex-start}
   .item.done .actions .x{margin-left:auto}
   .studio{display:none}
 }
@@ -438,10 +439,17 @@ function check(it, m = modeOf(it), t = it.sel.value) {
 }
 const canGo = (it) => (it.state === "idle" || it.state === "error") && !(check(it) || {}).block;
 
+// Targets offered for a row. Audio skips its own format (WAV to WAV does nothing useful);
+// images and video keep it, because re-encoding there shrinks or resizes the file.
+function targets(it, m) {
+  const e = it.ext === "jpeg" ? "jpg" : it.ext, list = T[it.kind][m];
+  const other = it.kind === "audio" ? list.filter((o) => o[2] !== e) : list;
+  return other.length ? other : list;
+}
 function fill(it) {
   const m = modeOf(it), prev = it.sel.value && outOf(it, it.selMode, it.sel.value);
-  it.sel.innerHTML = T[it.kind][m].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
-  const keep = prev && T[it.kind][m].find((o) => o[2] === prev);
+  it.sel.innerHTML = targets(it, m).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+  const keep = prev && targets(it, m).find((o) => o[2] === prev);
   it.sel.value = keep ? keep[0] : defaultTarget(it, m);
   it.selMode = m;
   renderChips(it);
@@ -456,10 +464,10 @@ function renderChips(it) {
     return b;
   }));
   box.onkeydown = (e) => {
-    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-    if (!d) return;
-    e.preventDefault();
     const opts = [...it.sel.options], i = opts.findIndex((o) => o.value === it.sel.value);
+    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: -i, End: opts.length - 1 - i }[e.key];
+    if (d === undefined) return;
+    e.preventDefault();
     pickChip(it, opts[(i + d + opts.length) % opts.length].value);
     $(`.chip[aria-checked=true]`, box).focus();
   };
@@ -514,8 +522,8 @@ function addFiles(files) {
     el.innerHTML = `<div class="thumb"></div>
       <div style="min-width:0"><div class="name"></div><div class="meta"><span class="num">${fmtSize(f.size)}</span><span class="tag"></span><span class="status" role="status"></span></div>
       <div class="track" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"></div><div class="dot"></div></div></div>
-      <div class="actions"><select aria-label="Target format"></select><button class="x" title="Remove" aria-label="Remove">×</button></div>
-      <div class="into"><span class="label">Turn it into</span><div class="chips" role="radiogroup"></div><button class="btn ghost small fix" hidden></button></div>`;
+      <div class="into"><span class="label">Turn it into</span><div class="chips" role="radiogroup"></div><button class="btn ghost small fix" hidden></button></div>
+      <div class="actions"><select aria-label="Target format"></select><button class="x" title="Remove" aria-label="Remove">×</button></div>`;
     $(".name", el).textContent = f.name;
     $(".chips", el).setAttribute("aria-label", "Turn " + f.name + " into");
     $(".thumb", el).textContent = ext(f.name).slice(0, 4) || "?";
