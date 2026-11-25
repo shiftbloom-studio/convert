@@ -1,16 +1,13 @@
-// Syntax check for the Worker and the inline browser script, without a bundler.
+// Syntax check for the browser code: the ffmpeg worker and the inline script in ui.html.
+// The Worker itself is TypeScript and is checked by tsc (npm run check runs it first).
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const dir = mkdtempSync(join(tmpdir(), "convert-check-"));
-const files = [];
+const files: [string, string][] = [];
 
-const worker = readFileSync("src/index.js", "utf8")
-  .replace(/^import \{ WorkflowEntrypoint \}.*$/m, "class WorkflowEntrypoint {}")
-  .replace(/^import (\w+) from "\.\/.*";$/gm, 'const $1 = "";');
-files.push(["worker.mjs", worker]);
 files.push(["ffworker.js", readFileSync("src/ffworker.js.txt", "utf8")]);
 const html = readFileSync("src/ui.html", "utf8");
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);

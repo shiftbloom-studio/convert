@@ -10,7 +10,7 @@ Thanks for wanting to help. This is a small tool, so contributing should feel sm
 
 ## Making changes
 
-- Keep it dependency-free at runtime: the Worker is plain JavaScript, the UI is one HTML file.
+- Keep it dependency-free at runtime: the Worker is strict TypeScript (erasable syntax only, bundled by Wrangler), the UI is one HTML file.
 - Run `npm run check` and `npm run build` before opening a pull request. CI runs both.
 - One topic per pull request, with a short description of what changed and how you tested it.
 - UI changes: add a screenshot to the pull request.

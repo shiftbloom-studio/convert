@@ -1,9 +1,53 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 shiftbloom studio and contributors
 import { WorkflowEntrypoint } from "cloudflare:workers";
+import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import HTML from "./ui.html";
-import { faviconSvg } from "./bloom.js";
+import { faviconSvg } from "./bloom.ts";
 import FFWORKER from "./ffworker.js.txt";
+
+export interface Env {
+  DB: D1Database;
+  FILES: R2Bucket;
+  IMAGES: ImagesBinding;
+  MEDIA: MediaBinding;
+  STREAM: StreamBinding;
+  CONVERT_JOB: Workflow<{ id: string }>;
+  IMG_LIMIT: RateLimit;
+  JOB_LIMIT: RateLimit;
+  TURNSTILE_SECRET: string;
+  TURNSTILE_SITEKEY: string;
+  IMAGE_DAILY_PER_IP: string;
+  IMAGE_DAILY_GLOBAL: string;
+  JOB_DAILY_PER_IP: string;
+  JOB_DAILY_GLOBAL: string;
+}
+
+/** A row of the jobs table (schema.sql). */
+interface JobRow {
+  id: string;
+  kind: string;
+  engine: "media" | "stream";
+  status: string;
+  progress: number;
+  step: string;
+  input_name: string | null;
+  input_key: string | null;
+  output_key: string;
+  output_name: string | null;
+  output_type: string | null;
+  output_size: number | null;
+  stream_uid: string | null;
+  options: string | null;
+  error: string | null;
+  ip_hash: string;
+  created_at: number;
+  updated_at: number;
+}
+
+interface JobOptions { target: string; width?: number; mute?: boolean; time?: string }
+interface CreateJobBody { name?: string; size?: number; type?: string; target?: string; width?: number | string; mute?: boolean; time?: string; turnstile?: string }
+type VideoTarget = { mode: "video" | "audio" | "frame"; ext: string; type: string };
 
 const MB = 1024 * 1024;
 const LIMITS = {
@@ -12,61 +56,61 @@ const LIMITS = {
   streamBytes: 200 * MB, // Stream basic direct upload limit
   maxDurationSeconds: 600,
 };
-const IMAGE_FORMATS = { png: "image/png", jpeg: "image/jpeg", webp: "image/webp", avif: "image/avif" };
-const VIDEO_TARGETS = {
+const IMAGE_FORMATS: Record<string, ImageOutputOptions["format"]> = { png: "image/png", jpeg: "image/jpeg", webp: "image/webp", avif: "image/avif" };
+const VIDEO_TARGETS: Record<string, VideoTarget> = {
   mp4: { mode: "video", ext: "mp4", type: "video/mp4" },
   m4a: { mode: "audio", ext: "m4a", type: "audio/mp4" },
   jpg: { mode: "frame", ext: "jpg", type: "image/jpeg" },
   png: { mode: "frame", ext: "png", type: "image/png" },
 };
 
-const json = (data, status = 200, headers = {}) =>
+const json = (data: unknown, status = 200, headers: Record<string, string> = {}): Response =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", ...headers } });
-const err = (message, status = 400) => json({ error: message }, status);
+const err = (message: string, status = 400): Response => json({ error: message }, status);
 const now = () => Date.now();
 const today = () => new Date().toISOString().slice(0, 10);
 
-async function ipHash(req) {
+async function ipHash(req: Request): Promise<string> {
   const ip = req.headers.get("cf-connecting-ip") || "unknown";
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip + ":" + today()));
   return [...new Uint8Array(d)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // Daily quota counter in D1. Returns false when over limit.
-async function takeQuota(env, subject, limit, units = 1) {
+async function takeQuota(env: Env, subject: string, limit: number, units = 1): Promise<boolean> {
   const row = await env.DB.prepare(
     "INSERT INTO usage (day, subject, units) VALUES (?1, ?2, ?3) ON CONFLICT(day, subject) DO UPDATE SET units = units + ?3 RETURNING units"
-  ).bind(today(), subject, units).first();
-  return row.units <= limit;
+  ).bind(today(), subject, units).first<{ units: number }>();
+  return row!.units <= limit;
 }
 
-async function verifyTurnstile(env, token, req) {
+async function verifyTurnstile(env: Env, token: string | undefined, req: Request): Promise<boolean> {
   if (!token) return false;
   const body = new FormData();
   body.append("secret", env.TURNSTILE_SECRET);
   body.append("response", token);
   body.append("remoteip", req.headers.get("cf-connecting-ip") || "");
   const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body });
-  const out = await r.json();
+  const out = await r.json<{ success?: boolean }>();
   return !!out.success;
 }
 
-const safeName = (name, ext) =>
+const safeName = (name: string | null | undefined, ext: string): string =>
   ((name || "file").replace(/\.[^.]+$/, "").replace(/[^\w.\- ]+/g, "_").slice(0, 80) || "file") + "." + ext;
 
-async function updateJob(env, id, fields) {
+async function updateJob(env: Env, id: string, fields: Partial<JobRow>): Promise<void> {
   const keys = Object.keys(fields);
   const sets = keys.map((k, i) => `${k} = ?${i + 2}`).join(", ");
   await env.DB.prepare(`UPDATE jobs SET ${sets}, updated_at = ?${keys.length + 2} WHERE id = ?1`)
-    .bind(id, ...keys.map((k) => fields[k]), now())
+    .bind(id, ...keys.map((k) => fields[k as keyof JobRow]), now())
     .run();
 }
 
 // Stream an unknown-length body into R2 using multipart upload (parts >= 5 MiB).
-async function putStream(bucket, key, stream, contentType, contentDisposition) {
+async function putStream(bucket: R2Bucket, key: string, stream: ReadableStream<Uint8Array>, contentType: string, contentDisposition: string): Promise<number> {
   const upload = await bucket.createMultipartUpload(key, { httpMetadata: { contentType, contentDisposition } });
   const PART = 10 * MB;
-  const parts = [];
+  const parts: R2UploadedPart[] = [];
   let buf = new Uint8Array(PART);
   let len = 0;
   let size = 0;
@@ -99,13 +143,13 @@ async function putStream(bucket, key, stream, contentType, contentDisposition) {
 }
 
 // ---------------------------------------------------------------- Workflow
-export class ConvertJob extends WorkflowEntrypoint {
-  async run(event, step) {
+export class ConvertJob extends WorkflowEntrypoint<Env, { id: string }> {
+  async run(event: WorkflowEvent<{ id: string }>, step: WorkflowStep) {
     const { id } = event.payload;
     const env = this.env;
-    const job = await step.do("load", async () => env.DB.prepare("SELECT * FROM jobs WHERE id = ?1").bind(id).first());
+    const job = (await step.do("load", async () => env.DB.prepare("SELECT * FROM jobs WHERE id = ?1").bind(id).first() as never)) as JobRow | null;
     if (!job) return { error: "missing job" };
-    const opts = JSON.parse(job.options || "{}");
+    const opts: JobOptions = JSON.parse(job.options || "{}");
     const target = VIDEO_TARGETS[opts.target];
     const outName = safeName(job.input_name, target.ext);
     const disposition = `attachment; filename="${outName}"`;
@@ -116,11 +160,11 @@ export class ConvertJob extends WorkflowEntrypoint {
           await updateJob(env, id, { status: "processing", progress: 30, step: "Konvertiere mit Media Transformations" });
           const obj = await env.FILES.get(`in/${id}`);
           if (!obj) throw new Error("Eingabedatei fehlt");
-          let t = env.MEDIA.input(obj.body);
-          if (opts.width) t = t.transform({ width: opts.width, fit: "scale-down" });
-          const out = { mode: target.mode };
+          let t: MediaTransformer | MediaTransformationGenerator = env.MEDIA.input(obj.body);
+          if (opts.width) t = (t as MediaTransformer).transform({ width: opts.width, fit: "scale-down" });
+          const out: MediaTransformationOutputOptions = { mode: target.mode };
           if (target.mode === "frame") {
-            out.format = target.ext;
+            out.format = target.ext as never;
             out.time = opts.time || "0s";
           }
           if (target.mode === "video" && opts.mute) out.audio = false;
@@ -130,15 +174,15 @@ export class ConvertJob extends WorkflowEntrypoint {
         });
       } else {
         // Stream engine: wait for encode, generate download, copy to R2, delete from Stream.
-        const video = () => env.STREAM.video(job.stream_uid);
+        const video = () => env.STREAM.video(job.stream_uid!);
         let ready = false;
         for (let i = 0; i < 180 && !ready; i++) {
           ready = await step.do(`encode-${i}`, async () => {
             const d = await video().details();
             const state = d.status?.state;
-            if (state === "error") throw new Error("Stream: " + (d.status.errorReasonText || "Encoding fehlgeschlagen"));
-            if (d.duration > LIMITS.maxDurationSeconds) throw new Error("Video ist länger als 10 Minuten");
-            const pct = parseFloat(d.status?.pctComplete || "0") || 0;
+            if (state === "error") throw new Error("Stream: " + (d.status!.errorReasonText || "Encoding fehlgeschlagen"));
+            if (d.duration! > LIMITS.maxDurationSeconds) throw new Error("Video ist länger als 10 Minuten");
+            const pct = parseFloat((d.status?.pctComplete as string | undefined) || "0") || 0;
             await updateJob(env, id, { status: "processing", progress: Math.round(10 + pct * 0.5), step: "Stream encodiert" });
             return !!d.readyToStream;
           });
@@ -150,13 +194,13 @@ export class ConvertJob extends WorkflowEntrypoint {
         await step.do("generate-download", async () => {
           await video().downloads.generate(kind);
         });
-        let url = null;
+        let url: string | null = null;
         for (let i = 0; i < 120 && !url; i++) {
           url = await step.do(`download-${i}`, async () => {
-            const d = (await video().downloads.get())[kind];
+            const d = ((await video().downloads.get()) as Record<string, { status?: string; url?: string; percentComplete?: number } | undefined>)[kind];
             if (d?.status === "error") throw new Error("Stream: Download konnte nicht erzeugt werden");
             await updateJob(env, id, { progress: Math.round(60 + (d?.percentComplete || 0) * 0.25), step: "Erzeuge Datei" });
-            return d?.status === "ready" ? d.url : null;
+            return d?.status === "ready" ? d.url! : null;
           });
           if (!url) await step.sleep(`wait-download-${i}`, "5 seconds");
         }
@@ -164,9 +208,9 @@ export class ConvertJob extends WorkflowEntrypoint {
 
         await step.do("copy", { retries: { limit: 3, delay: "10 seconds" }, timeout: "10 minutes" }, async () => {
           await updateJob(env, id, { progress: 88, step: "Speichere Ergebnis" });
-          const r = await fetch(url);
+          const r = await fetch(url!);
           if (!r.ok) throw new Error("Download von Stream fehlgeschlagen: " + r.status);
-          const size = await putStream(env.FILES, `out/${id}`, r.body, target.type, disposition);
+          const size = await putStream(env.FILES, `out/${id}`, r.body!, target.type, disposition);
           await updateJob(env, id, { output_size: size });
         });
         await step.do("cleanup-stream", async () => {
@@ -184,7 +228,7 @@ export class ConvertJob extends WorkflowEntrypoint {
       return { ok: true };
     } catch (e) {
       await step.do("fail", async () => {
-        await updateJob(env, id, { status: "error", error: String(e.message || e).slice(0, 300), step: "Fehler" });
+        await updateJob(env, id, { status: "error", error: String((e as Error).message || e).slice(0, 300), step: "Fehler" });
         await env.FILES.delete(`in/${id}`);
         if (job.stream_uid) await env.STREAM.video(job.stream_uid).delete().catch(() => {});
       });
@@ -194,56 +238,56 @@ export class ConvertJob extends WorkflowEntrypoint {
 }
 
 // ---------------------------------------------------------------- HTTP
-async function handleImage(req, env, url) {
+async function handleImage(req: Request, env: Env, url: URL): Promise<Response> {
   const ip = await ipHash(req);
   const { success } = await env.IMG_LIMIT.limit({ key: ip });
   if (!success) return err("Zu viele Anfragen, bitte kurz warten.", 429);
   const format = url.searchParams.get("format");
-  if (!IMAGE_FORMATS[format]) return err("Unbekanntes Zielformat");
-  const size = +req.headers.get("content-length") || 0;
+  if (!IMAGE_FORMATS[format!]) return err("Unbekanntes Zielformat");
+  const size = +req.headers.get("content-length")! || 0;
   if (!size || size > LIMITS.imageBytes) return err("Bilder dürfen max. 25 MB groß sein", 413);
   if (!(await takeQuota(env, "img:" + ip, +env.IMAGE_DAILY_PER_IP))) return err("Tageslimit für Bilder erreicht", 429);
   if (!(await takeQuota(env, "img:global", +env.IMAGE_DAILY_GLOBAL))) return err("Globales Tageslimit erreicht, bitte morgen wieder", 429);
 
-  const quality = Math.min(100, Math.max(1, +url.searchParams.get("quality") || 85));
-  const width = +url.searchParams.get("width") || 0;
+  const quality = Math.min(100, Math.max(1, +url.searchParams.get("quality")! || 85));
+  const width = +url.searchParams.get("width")! || 0;
   try {
-    let t = env.IMAGES.input(req.body);
+    let t = env.IMAGES.input(req.body!);
     if (width > 0) t = t.transform({ width: Math.min(width, 12000), fit: "scale-down" });
-    const out = await t.output({ format: IMAGE_FORMATS[format], quality, anim: format === "webp" ? undefined : false });
-    const name = safeName(url.searchParams.get("name"), format === "jpeg" ? "jpg" : format);
+    const out = await t.output({ format: IMAGE_FORMATS[format!]!, quality, anim: format === "webp" ? undefined : false });
+    const name = safeName(url.searchParams.get("name"), format === "jpeg" ? "jpg" : format!);
     return out.response({
       headers: { "content-disposition": `attachment; filename="${name}"`, "cache-control": "no-store" },
     });
   } catch (e) {
-    return err("Konvertierung fehlgeschlagen: " + (e.message || e), 422);
+    return err("Konvertierung fehlgeschlagen: " + ((e as Error).message || e), 422);
   }
 }
 
-async function createJob(req, env) {
+async function createJob(req: Request, env: Env): Promise<Response> {
   const ip = await ipHash(req);
   const { success } = await env.JOB_LIMIT.limit({ key: ip });
   if (!success) return err("Zu viele Jobs, bitte kurz warten.", 429);
-  const body = await req.json().catch(() => ({}));
+  const body = await req.json<CreateJobBody>().catch(() => ({}) as CreateJobBody);
   const { name, size, type, target, width, mute, time, turnstile } = body;
-  if (!VIDEO_TARGETS[target]) return err("Unbekanntes Zielformat");
-  if (!(size > 0)) return err("Datei fehlt");
+  if (!VIDEO_TARGETS[target!]) return err("Unbekanntes Zielformat");
+  if (!(size! > 0)) return err("Datei fehlt");
   if (!(await verifyTurnstile(env, turnstile, req))) return err("Bot-Check fehlgeschlagen, bitte neu laden.", 403);
 
   const isMp4 = /^video\/(mp4|quicktime)$/.test(type || "") || /\.(mp4|m4v)$/i.test(name || "");
-  let engine;
-  if (isMp4 && size <= LIMITS.mediaBytes) engine = "media";
-  else if (size <= LIMITS.streamBytes && VIDEO_TARGETS[target].mode !== "frame") engine = "stream";
-  else if (VIDEO_TARGETS[target].mode === "frame") return err("Standbilder gehen in der Cloud nur aus MP4 bis 100 MB. Nutze den lokalen Modus.");
+  let engine: JobRow["engine"];
+  if (isMp4 && size! <= LIMITS.mediaBytes) engine = "media";
+  else if (size! <= LIMITS.streamBytes && VIDEO_TARGETS[target!].mode !== "frame") engine = "stream";
+  else if (VIDEO_TARGETS[target!].mode === "frame") return err("Standbilder gehen in der Cloud nur aus MP4 bis 100 MB. Nutze den lokalen Modus.");
   else return err("Cloud-Konvertierung bis 200 MB. Größere Dateien bitte lokal konvertieren.", 413);
 
   if (!(await takeQuota(env, "job:" + ip, +env.JOB_DAILY_PER_IP))) return err("Tageslimit für Videos erreicht", 429);
   if (!(await takeQuota(env, "job:global", +env.JOB_DAILY_GLOBAL))) return err("Globales Tageslimit erreicht, bitte morgen wieder", 429);
 
   const id = crypto.randomUUID();
-  const options = JSON.stringify({ target, width: Math.min(+width || 0, 2000) || undefined, mute: !!mute, time: /^\d+(\.\d+)?s$/.test(time || "") ? time : undefined });
-  let upload;
-  let streamUid = null;
+  const options = JSON.stringify({ target, width: Math.min(+width! || 0, 2000) || undefined, mute: !!mute, time: /^\d+(\.\d+)?s$/.test(time || "") ? time : undefined });
+  let upload: { method: string; url: string; field?: string; then?: string };
+  let streamUid: string | null = null;
   if (engine === "media") {
     upload = { method: "PUT", url: `/api/jobs/${id}/upload` };
   } else {
@@ -261,26 +305,26 @@ async function createJob(req, env) {
   return json({ id, engine, upload });
 }
 
-async function getJob(env, id) {
-  return env.DB.prepare("SELECT * FROM jobs WHERE id = ?1").bind(id).first();
+async function getJob(env: Env, id: string): Promise<JobRow | null> {
+  return env.DB.prepare("SELECT * FROM jobs WHERE id = ?1").bind(id).first<JobRow>();
 }
 
-async function startWorkflow(env, id) {
+async function startWorkflow(env: Env, id: string): Promise<void> {
   await updateJob(env, id, { status: "queued", progress: 5, step: "In der Warteschlange" });
   await env.CONVERT_JOB.create({ id, params: { id } });
 }
 
-async function handleUpload(req, env, id) {
+async function handleUpload(req: Request, env: Env, id: string): Promise<Response> {
   const job = await getJob(env, id);
   if (!job || job.engine !== "media" || job.status !== "uploading") return err("Job nicht gefunden", 404);
-  const size = +req.headers.get("content-length") || 0;
+  const size = +req.headers.get("content-length")! || 0;
   if (!size || size > LIMITS.mediaBytes) return err("Datei zu groß", 413);
   await env.FILES.put(`in/${id}`, req.body, { httpMetadata: { contentType: req.headers.get("content-type") || "video/mp4" } });
   await startWorkflow(env, id);
   return json({ ok: true });
 }
 
-function publicJob(job) {
+function publicJob(job: JobRow) {
   return {
     id: job.id, engine: job.engine, status: job.status, progress: job.progress, step: job.step,
     error: job.error, outputName: job.output_name, outputSize: job.output_size,
@@ -311,23 +355,23 @@ const FONT_CSS = [
   "https://api.fontshare.com/v2/css?f[]=general-sans@400,500&display=swap",
   "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap",
 ];
-const FONT_HOSTS = { fs: "https://cdn.fontshare.com/", gs: "https://fonts.gstatic.com/" };
+const FONT_HOSTS: Record<string, string> = { fs: "https://cdn.fontshare.com/", gs: "https://fonts.gstatic.com/" };
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
-async function fontCss(ctx) {
+async function fontCss(ctx: ExecutionContext): Promise<Response> {
   const cache = caches.default;
   const key = new Request("https://convert.internal/fonts.css?v=2");
   let res = await cache.match(key);
   if (res) return res;
   const parts = await Promise.all(FONT_CSS.map((u) => fetch(u, { headers: { "user-agent": UA } }).then((r) => (r.ok ? r.text() : ""))));
   const css = parts.join("\n").replace(/url\((['"]?)(?:https?:)?\/\/(cdn\.fontshare\.com|fonts\.gstatic\.com)\/([^'")]+)\1\)/g,
-    (_, q, host, path) => `url(/fonts/${host.startsWith("cdn") ? "fs" : "gs"}/${path})`);
+    (_, q, host: string, path: string) => `url(/fonts/${host.startsWith("cdn") ? "fs" : "gs"}/${path})`);
   res = new Response(css, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=86400" } });
   if (css.length > 100) ctx.waitUntil(cache.put(key, res.clone()));
   return res;
 }
 
-async function fontFile(kind, path) {
+async function fontFile(kind: string, path: string): Promise<Response> {
   const base = FONT_HOSTS[kind];
   if (!base || path.includes("..")) return err("Not found", 404);
   const r = await fetch(base + path, { headers: { "user-agent": UA }, cf: { cacheEverything: true, cacheTtl: 2592000 } });
@@ -335,7 +379,7 @@ async function fontFile(kind, path) {
   return new Response(r.body, { headers: { "content-type": r.headers.get("content-type") || "font/woff2", "cache-control": "public, max-age=31536000, immutable", "access-control-allow-origin": "*" } });
 }
 
-async function route(req, env, ctx) {
+async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(req.url);
   const p = url.pathname;
   const m = req.method;
@@ -374,7 +418,7 @@ async function route(req, env, ctx) {
       if (!obj) return err("Datei abgelaufen (Ergebnisse werden nach 24 h gelöscht)", 410);
       const h = new Headers();
       obj.writeHttpMetadata(h);
-      h.set("content-length", obj.size);
+      h.set("content-length", obj.size as unknown as string);
       h.set("cache-control", "private, no-store");
       return new Response(obj.body, { headers: h });
     }
@@ -383,7 +427,7 @@ async function route(req, env, ctx) {
 }
 
 export default {
-  async fetch(req, env, ctx) {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       return await route(req, env, ctx);
     } catch (e) {
@@ -392,7 +436,7 @@ export default {
     }
   },
   // Safety net: remove leftover Stream videos and old job rows.
-  async scheduled(event, env, ctx) {
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const cutoff = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
     const vids = await env.STREAM.videos.list({ before: cutoff, limit: 100 }).catch(() => []);
     for (const v of vids) if (v.creator === "convert") await env.STREAM.video(v.id).delete().catch(() => {});
