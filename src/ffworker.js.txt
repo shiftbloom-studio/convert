@@ -27,17 +27,17 @@ async function load() {
 self.onmessage = async ({ data }) => {
   const { id, file, args, outName } = data;
   try {
-    self.postMessage({ id, type: "status", status: "Lade ffmpeg (einmalig ~30 MB)…" });
+    self.postMessage({ id, type: "status", status: "Loading ffmpeg, about 30 MB the first time …" });
     const core = await load();
     duration = 0;
     const inName = "in_" + (file.name || "input").replace(/[^\w.]+/g, "_");
     core.FS.writeFile(inName, new Uint8Array(await file.arrayBuffer()));
-    self.postMessage({ id, type: "status", status: "Konvertiere lokal…" });
+    self.postMessage({ id, type: "status", status: "Converting …" });
     core.exec("-i", inName, ...args, outName);
     const ret = core.ret;
     core.reset();
     core.FS.unlink(inName);
-    if (ret !== 0) throw new Error("ffmpeg Fehlercode " + ret);
+    if (ret !== 0) throw new Error("ffmpeg exit code " + ret);
     const out = core.FS.readFile(outName);
     core.FS.unlink(outName);
     self.postMessage({ id, type: "done", data: out.buffer }, [out.buffer]);

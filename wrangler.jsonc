@@ -8,7 +8,10 @@
   // Serve on your own hostname by uncommenting (the zone must be on your Cloudflare account):
   // "routes": [{ "pattern": "convert.example.com", "custom_domain": true }],
 
-  "rules": [{ "type": "Text", "globs": ["**/*.html", "**/*.txt"], "fallthrough": true }],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.html", "**/*.txt"], "fallthrough": true },
+    { "type": "Data", "globs": ["**/*.png"], "fallthrough": true }
+  ],
   "triggers": { "crons": ["17 * * * *"] },
 
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "convert-files" }],

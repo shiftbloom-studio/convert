@@ -13,7 +13,7 @@ Please include what you found, how to reproduce it and the impact you expect. We
 - The Worker in `src/` and the deployment at convert.shiftbloom.studio.
 - Abuse vectors that bypass rate limits, quotas or Turnstile and could cause cost or availability problems.
 
-Out of scope: denial of service through volumetric traffic, reports that require a compromised Cloudflare account, and issues in third-party services (Cloudflare, jsDelivr, ffmpeg.wasm) — please report those upstream.
+Out of scope: denial of service through volumetric traffic, reports that require a compromised Cloudflare account, and issues in third-party services such as Cloudflare, jsDelivr or ffmpeg.wasm. Please report those upstream.
 
 ## Supported versions
 
