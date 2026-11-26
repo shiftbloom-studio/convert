@@ -133,11 +133,15 @@ export async function passConfig(env, url) {
 
 // ---------------------------------------------------------------- checking a pass
 
-/** The pass in `Authorization: PrivateToken token="..."` (RFC 9577, section 2.2), or null. */
+/**
+ * The pass in `Authorization: PrivateToken token="..."` (RFC 9577, section 2.2). null when the request
+ * has no PrivateToken header (other schemes, e.g. from a proxy, are left alone), "" when it's malformed.
+ */
 export function readPass(req) {
   const h = req.headers.get("authorization") || "";
+  if (!/^PrivateToken(\s|$)/i.test(h)) return null;
   const m = /^PrivateToken\s+token="?([A-Za-z0-9_-]{1,600})"?\s*$/i.exec(h);
-  return m ? m[1] : h ? "" : null;
+  return m ? m[1] : "";
 }
 
 /**
@@ -159,13 +163,14 @@ export async function checkPass(env, url, token) {
 }
 
 /**
- * Checks and spends the pass on a request. null: the request has none. Otherwise { ok } or { ok: false, reason }.
+ * Checks and spends the pass on a request. null: the request has none, or passes are off (then nothing
+ * changes for any request). Otherwise { ok, keyId, nonce } or { ok: false, reason }.
  * A pass counts once, across all of convert: one Durable Object per issuer key holds the spent nonces.
  */
 export async function spendPass(req, env, url) {
+  if (!passIssuer(env) || !env.SPENT) return null;
   const token = readPass(req);
   if (token === null) return null;
-  if (!passIssuer(env) || !env.SPENT) return { ok: false, reason: "off" };
   if (!token) return { ok: false, reason: "malformed" };
   let c;
   try {
@@ -176,7 +181,16 @@ export async function spendPass(req, env, url) {
   }
   if (!c.ok) return c;
   const r = await env.SPENT.get(env.SPENT.idFromName(c.keyId)).fetch("https://spent/" + c.nonce, { method: "POST" });
-  return r.status === 201 ? { ok: true } : { ok: false, reason: "spent" };
+  return r.status === 201 ? { ok: true, keyId: c.keyId, nonce: c.nonce } : { ok: false, reason: "spent" };
+}
+
+/** Gives back a pass that was spent on a request convert then refused anyway (the global cap). */
+export async function unspendPass(env, pass) {
+  try {
+    await env.SPENT.get(env.SPENT.idFromName(pass.keyId)).fetch("https://spent/" + pass.nonce, { method: "DELETE" });
+  } catch (e) {
+    console.error("pass refund failed", e);
+  }
 }
 
 /**
@@ -190,7 +204,12 @@ export class SpentPasses {
   }
   async fetch(req) {
     const nonce = new URL(req.url).pathname.slice(1);
-    if (req.method !== "POST" || !/^[A-Za-z0-9_-]{43}$/.test(nonce)) return new Response(null, { status: 400 });
+    if (!/^[A-Za-z0-9_-]{43}$/.test(nonce)) return new Response(null, { status: 400 });
+    if (req.method === "DELETE") {
+      this.state.storage.sql.exec("DELETE FROM spent WHERE nonce = ?", nonce);
+      return new Response(null, { status: 204 });
+    }
+    if (req.method !== "POST") return new Response(null, { status: 400 });
     // RETURNING tells "inserted" from "already there" (rowsWritten also counts the index write).
     const fresh = this.state.storage.sql.exec("INSERT INTO spent (nonce, at) VALUES (?, ?) ON CONFLICT(nonce) DO NOTHING RETURNING nonce", nonce, Date.now()).toArray().length === 1;
     if (fresh && !(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now() + 3 * 86400 * 1000);

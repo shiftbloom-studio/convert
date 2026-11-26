@@ -678,6 +678,7 @@ async function convertImage(it, fmt) {
   let { x, j } = await send(false, pass);
   if (x.status === 401 && j.code === "session") ({ x, j } = await send(true, pass));
   for (let tries = 0; x.status !== 200 && tries < 2 && (pass = retryWithPass(x.status, j, "images", !!pass)); tries++) ({ x, j } = await send(false, pass));
+  if (x.status === 429 && j.scope === "global") convertPasses.giveBack?.(pass);
   if (passesOn()) showPasses();
   if (x.status !== 200) throw E(j.error || "Something went wrong. Try again in a moment.", j.detail || "HTTP " + x.status);
   if (quotaLeft && !pass) quotaLeft.images = Math.max(0, quotaLeft.images - 1);
@@ -747,6 +748,7 @@ async function convertVideoCloud(it, target) {
   let pass = passFor("videos");
   let { r, job } = await create(pass);
   for (let tries = 0; !r.ok && tries < 2 && (pass = retryWithPass(r.status, job, "videos", !!pass)); tries++) ({ r, job } = await create(pass));
+  if (r.status === 429 && job.scope === "global") convertPasses.giveBack?.(pass);
   if (passesOn()) showPasses();
   if (!r.ok) throw E(job.error || "Something went wrong. Try again in a moment.", job.detail || "HTTP " + r.status);
   const up = job.upload;

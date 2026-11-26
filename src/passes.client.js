@@ -120,5 +120,11 @@
     return p ? p.t : null;
   }
 
-  globalThis.convertPasses = { config, refill, take, count: () => usable().length, _blind: blind, _finalize: finalize };
+  /** Puts a pass back that the server didn't keep (it refused the request for everyone, see unspendPass). */
+  function giveBack(t) {
+    if (!t) return;
+    try { save([{ t, k: b64u(unb64u(t).subarray(66, 98)) }].concat(load())); } catch {}
+  }
+
+  globalThis.convertPasses = { config, refill, take, giveBack, count: () => usable().length, _blind: blind, _finalize: finalize };
 })();

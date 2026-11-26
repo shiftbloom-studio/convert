@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { publicVerif, Token, TOKEN_TYPES } from "@cloudflare/privacypass-ts";
-import { challenge, checkPass, spendPass, passConfig, SpentPasses, b64u, unb64u, tokenKeyJwk, resetPassKeys } from "../src/passes.js";
+import { challenge, checkPass, spendPass, unspendPass, passConfig, SpentPasses, b64u, unb64u, tokenKeyJwk, resetPassKeys } from "../src/passes.js";
 await import("../src/passes.client.js");
 const P = globalThis.convertPasses;
 
@@ -99,17 +99,26 @@ test("a pass is spent once", async () => {
   const c = new publicVerif.Client(mode);
   const token = b64u((await c.finalize(await iss.issuer.issue(await c.createTokenRequest(new publicVerif.Origin(mode, ["convert.test"]).createTokenChallenge("stem.test", new Uint8Array(0)), iss.tokenKey)))).serialize());
   const req = () => new Request(SITE, { method: "POST", headers: { authorization: `PrivateToken token="${token}"` } });
-  assert.deepEqual(await spendPass(req(), env, SITE), { ok: true });
+  const first = await spendPass(req(), env, SITE);
+  assert.equal(first.ok, true);
   assert.deepEqual(await spendPass(req(), env, SITE), { ok: false, reason: "spent" });
   assert.equal(await spendPass(new Request(SITE, { method: "POST" }), env, SITE), null);
   assert.deepEqual(await spendPass(new Request(SITE, { method: "POST", headers: { authorization: "PrivateToken nope" } }), env, SITE), { ok: false, reason: "malformed" });
-  // Off when no issuer is configured, even with a pass.
-  assert.deepEqual(await spendPass(req(), { ...env, PASS_ISSUER: "" }, SITE), { ok: false, reason: "off" });
+  // Other schemes (a proxy's Bearer or Basic) aren't passes and are left alone.
+  for (const h of ["Bearer abc", "Basic dXNlcjpwdw==", "PrivateTokenX token=abc"])
+    assert.equal(await spendPass(new Request(SITE, { method: "POST", headers: { authorization: h } }), env, SITE), null);
+  // Off when no issuer is configured: every request is treated as before, with or without a pass.
+  assert.equal(await spendPass(req(), { ...env, PASS_ISSUER: "" }, SITE), null);
+  assert.equal(await spendPass(new Request(SITE, { method: "POST", headers: { authorization: "PrivateToken nope" } }), { ...env, PASS_ISSUER: "" }, SITE), null);
+  // A pass given back (the global cap refused the request) can be spent again, once.
+  await unspendPass(env, first);
+  assert.equal((await spendPass(req(), env, SITE)).ok, true);
+  assert.deepEqual(await spendPass(req(), env, SITE), { ok: false, reason: "spent" });
   // The object forgets everything three days after its first pass.
   const o = env.SPENT.objects.get(iss.keyId);
   assert.ok(o.alarm > Date.now() + 2.9 * 86400 * 1000);
   await o.obj.alarm();
-  assert.deepEqual(await spendPass(req(), env, SITE), { ok: true });
+  assert.equal((await spendPass(req(), env, SITE)).ok, true);
 });
 
 test("config hands the page the newest key and the challenge for this site", async () => {

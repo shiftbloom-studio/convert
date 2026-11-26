@@ -8,7 +8,7 @@ import OG from "./og.png";
 import { HOME, FAQ, PAGES, REPO } from "./pages.js";
 import { LEGAL, legalPage } from "./legal.js";
 import PASSES_JS from "./passes.client.js";
-import { spendPass, passConfig, passIssuer, SpentPasses } from "./passes.js";
+import { spendPass, unspendPass, passConfig, passIssuer, SpentPasses } from "./passes.js";
 
 export { SpentPasses };
 
@@ -49,7 +49,10 @@ async function takeDaily(req, env, url, kind, perIp, global, ip) {
   const pass = await spendPass(req, env, url);
   if (pass && !pass.ok) return json({ error: PASS_MSG, code: "pass", reason: pass.reason }, 401);
   if (!pass && !(await takeQuota(env, kind + ":" + ip, perIp))) return json({ error: QUOTA_MSG, code: "quota" }, 429);
-  if (!(await takeQuota(env, kind + ":global", global))) return json({ error: QUOTA_MSG, code: "quota", scope: "global" }, 429);
+  if (!(await takeQuota(env, kind + ":global", global))) {
+    if (pass) await unspendPass(env, pass); // the pass bought nothing, so it stays usable
+    return json({ error: QUOTA_MSG, code: "quota", scope: "global" }, 429);
+  }
   return null;
 }
 
