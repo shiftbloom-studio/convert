@@ -8,6 +8,7 @@ import OG from "./og.png";
 import { HOME, FAQ, PAGES, REPO } from "./pages.ts";
 import { LEGAL, legalPage } from "./legal.ts";
 import { requestLine } from "./accesslog.ts";
+import { phCapture, phException, phProxy, phScriptTag } from "./posthog.ts";
 import PASSES_JS from "./passes.client.js";
 import { spendPass, unspendPass, passConfig, passIssuer, SpentPasses } from "./passes.ts";
 import type { Env, Home, Job, Page } from "./types.ts";
@@ -287,6 +288,7 @@ export class ConvertJob extends WorkflowEntrypoint<Env, { id: string }> {
       await step.do("done", async () => {
         await env.FILES.delete(`in/${id}`);
         if (env.POSTHOG_LOGS) console.log({ message: "convert-job done", engine: job.engine, target: opts.target, seconds: Math.round((Date.now() - job.created_at) / 1000) });
+        await phCapture(env, null, "video_job_done", { engine: job.engine, target: opts.target, seconds: Math.round((Date.now() - job.created_at) / 1000) });
         await updateJob(env, id, {
           status: "done", progress: 100, step: "Done",
           output_key: `out/${id}`, output_name: outName, output_type: target.type,
@@ -306,6 +308,8 @@ export class ConvertJob extends WorkflowEntrypoint<Env, { id: string }> {
         await updateJob(env, id, { status: "error", error: msg + "\n" + raw, step: "Failed" });
         await env.FILES.delete(`in/${id}`);
         if (job.stream_uid) await env.STREAM.video(job.stream_uid).delete().catch(() => {});
+        await phCapture(env, null, "video_job_failed", { engine: job.engine, reason: raw.startsWith("too-long") ? "too_long" : raw.startsWith("timeout") ? "timeout" : "error" });
+        await phException(env, null, e, { where: "workflow", engine: job.engine });
       });
       return { ok: false };
     }
@@ -324,7 +328,7 @@ async function createSession(req: Request, env: Env, url: URL) {
   return json({ token: await sessionToken(env, req, expires), expires }, 200, { "cache-control": "no-store" });
 }
 
-async function handleImage(req: Request, env: Env, url: URL) {
+async function handleImage(req: Request, env: Env, url: URL, ctx: ExecutionContext) {
   if (!sameOrigin(req, url)) return err("This only works from the convert page.", 403);
   const ip = await ipHash(req, env);
   const { success } = await env.IMG_LIMIT.limit({ key: ip });
@@ -358,6 +362,7 @@ async function handleImage(req: Request, env: Env, url: URL) {
     if (width > 0) t = t.transform({ width: Math.min(width, IMAGE_SIDE), fit: "scale-down" });
     const out = await t.output({ format: IMAGE_FORMATS[format], quality, anim: format === "webp" ? undefined : false });
     const name = "image." + (format === "jpeg" ? "jpg" : format);
+    phCapture(env, ctx, "image_converted", { format, resized: width > 0 });
     return out.response({
       headers: { ...FILE_HEADERS, "content-type": IMAGE_FORMATS[format], "content-disposition": `attachment; filename="${name}"` },
     });
@@ -368,7 +373,7 @@ async function handleImage(req: Request, env: Env, url: URL) {
 
 type JobRequest = { name?: string; size?: number; type?: string; target?: string; width?: unknown; mute?: unknown; time?: string; turnstile?: unknown };
 
-async function createJob(req: Request, env: Env, url: URL) {
+async function createJob(req: Request, env: Env, url: URL, ctx: ExecutionContext) {
   if (!sameOrigin(req, url)) return err("This only works from the convert page.", 403);
   const ip = await ipHash(req, env);
   const { success } = await env.JOB_LIMIT.limit({ key: ip });
@@ -409,6 +414,7 @@ async function createJob(req: Request, env: Env, url: URL) {
   await env.DB.prepare(
     "INSERT INTO jobs (id, kind, engine, status, progress, step, input_name, input_key, stream_uid, options, ip_hash, created_at, updated_at) VALUES (?1, 'video', ?2, 'uploading', 0, 'Uploading', ?3, ?4, ?5, ?6, ?7, ?8, ?8)"
   ).bind(id, engine, String(name || "video").slice(0, 200), `in/${id}`, streamUid, options, ip, now()).run();
+  phCapture(env, ctx, "video_job_created", { engine, target });
   return json({ id, engine, upload });
 }
 
@@ -539,6 +545,8 @@ async function fontFile(kind: string, path: string) {
 const esc = (v: unknown) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
 const ldJson = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c");
 const BY_SLUG = Object.fromEntries(PAGES.map((p) => [p.slug, p]));
+/** Paths reported to PostHog as they are: the converter pages and the legal pages. Job URLs and anything else become /[private]. */
+const PH_KEEP = new RegExp(`^/(${[...PAGES.map((p) => p.slug), ...Object.keys(LEGAL)].map((s) => s.replace(/[^a-z0-9-]/gi, "")).join("|")})?$`);
 const fill = (tpl: string, map: Record<string, string>) => tpl.replace(/__([A-Z0-9]+)__/g, (m, k) => (k in map ? map[k] : m));
 const faqText = (a: string, env: Env) => a.replace("__IMG_DAY__", env.IMAGE_DAILY_PER_IP).replace("__JOB_DAY__", env.JOB_DAILY_PER_IP);
 
@@ -608,6 +616,7 @@ function renderPage(page: Page | null, env: Env, origin: string) {
     LINKS: links,
     PRESET: ldJson(page ? page.preset : null),
     SITEKEY: esc(env.TURNSTILE_SITEKEY),
+    POSTHOG: phScriptTag(env),
   });
 }
 
@@ -691,6 +700,8 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   const m = req.method;
 
   const origin = url.origin;
+  const ph = await phProxy(req, env, { app: "convert", keep: PH_KEEP });
+  if (ph) return ph;
   if (m === "GET" && (p === "/" || p === "/index.html"))
     return new Response(renderPage(null, env, origin), { headers: { ...htmlHeaders(env), "cache-control": "public, max-age=300" } });
   if (m === "GET" && BY_SLUG[p.slice(1)])
@@ -719,8 +730,8 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
   if (fm) return fontFile(fm[1], fm[2]);
   if (m === "GET" && p === "/api/health") return json({ ok: true });
   if (m === "POST" && p === "/api/session") return createSession(req, env, url);
-  if (m === "POST" && p === "/api/image") return handleImage(req, env, url);
-  if (m === "POST" && p === "/api/jobs") return createJob(req, env, url);
+  if (m === "POST" && p === "/api/image") return handleImage(req, env, url, ctx);
+  if (m === "POST" && p === "/api/jobs") return createJob(req, env, url, ctx);
 
   const jm = p.match(/^\/api\/jobs\/([0-9a-f-]{36})(\/(upload|start|download))?$/);
   if (jm) {
@@ -761,6 +772,7 @@ export default {
       res = await route(req, env, ctx);
     } catch (e) {
       console.error(e);
+      phException(env, ctx, e, { where: "fetch" });
       res = err("Something went wrong. Try again in a moment.", 500);
     }
     if (env.POSTHOG_LOGS) console.log(requestLine(req, res.status, Date.now() - started));

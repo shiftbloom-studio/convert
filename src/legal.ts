@@ -8,12 +8,13 @@
 
 import { passIssuer } from "./passes.ts";
 import type { Env } from "./types.ts";
+import { phKey, phScriptTag } from "./posthog.ts";
 
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
 
 const COUNTRIES: Record<string, [en: string, de: string]> = { DE: ["Germany", "Deutschland"], AT: ["Austria", "Österreich"], CH: ["Switzerland", "Schweiz"] };
 type Lang = "en" | "de";
-type Operator = ReturnType<typeof operator> & { passes?: string | null; logs?: LogRegion | null };
+type Operator = ReturnType<typeof operator> & { passes?: string | null; logs?: LogRegion | null; analytics?: boolean };
 
 function operator(env: Env) {
   const c = COUNTRIES[(env.LEGAL_COUNTRY || "").toUpperCase()] || [env.LEGAL_COUNTRY || "", env.LEGAL_COUNTRY || ""];
@@ -63,8 +64,23 @@ ${o.vat ? `<p>Umsatzsteuer-Identifikationsnummer gemäß § 27a UStG: ${esc(o.va
 <p>convert ist ein unabhängiges Open-Source-Projekt. Es nutzt Dienste von Cloudflare, steht aber in keiner Verbindung zu Cloudflare und wird von Cloudflare weder unterstützt noch empfohlen. FFmpeg ist eine Marke von Fabrice Bellard. Namen und Logos gehören ihren jeweiligen Inhabern.</p>`;
 }
 
+
+// Shown when POSTHOG_KEY is set (see src/posthog.ts).
+const USAGE_EN = `<h2>Usage statistics</h2>
+<p>To see which formats people need and where conversions fail, the pages of convert load a script that we deliver from convert itself (posthog-js, under /_sb/) and that reports to PostHog: which page was viewed and the site you came from (its domain only), that files were added (how many, and whether they are images, videos or audio), that a conversion started, finished or failed (input type such as "image", the file extension, the target format, whether it ran on Cloudflare or in your browser, and a rough duration), clicks on buttons and links (without their text, labels or link targets), how fast the page loaded, and errors in the page's code. File names, file contents, exact sizes, the error messages of failed conversions and passes are never sent, and nothing you type is recorded. Our Worker also reports, without your IP address, finished image conversions and video jobs with their target format and engine, and its own errors.</p>
+<p>The script sets no cookies and stores nothing on your device. PostHog derives a daily changing ID from your IP address and browser details on its servers, so visits on the same day can be counted together, but not across days. PostHog also uses the IP address to derive an approximate location (country and city). There is no session recording.</p>
+<p>PostHog Inc., 2261 Market St. #4008, San Francisco, CA 94114, USA, stores this data for us on servers in the USA and processes it as our processor under a data processing agreement (Art. 28 GDPR). PostHog is certified under the EU-U.S. Data Privacy Framework, for which the European Commission has adopted an adequacy decision (Art. 45 GDPR); the agreement also contains the EU standard contractual clauses. We delete the statistics after 12 months at the latest. The legal basis is our legitimate interest in improving convert and fixing errors (Art. 6(1)(f) GDPR). A content blocker or your browser's tracking protection may stop the script; convert works the same without it. More in <a href="https://posthog.com/privacy" rel="noopener">PostHog's privacy policy</a>.</p>
+
+`;
+const USAGE_DE = `<h2>Nutzungsstatistik</h2>
+<p>Damit wir sehen, welche Formate gebraucht werden und wo Umwandlungen scheitern, laden die Seiten von convert ein Skript, das wir von convert selbst ausliefern (posthog-js, unter /_sb/) und das an PostHog meldet: welche Seite aufgerufen wurde und von welcher Website du kommst (nur deren Domain), dass Dateien hinzugefügt wurden (wie viele und ob es Bilder, Videos oder Audio sind), dass eine Umwandlung begonnen hat, fertig ist oder gescheitert ist (Eingabetyp wie „Bild“, die Dateiendung, das Zielformat, ob sie bei Cloudflare oder in deinem Browser lief, und eine grobe Dauer), Klicks auf Schaltflächen und Links (ohne deren Text, Beschriftung oder Linkziel), wie schnell die Seite geladen hat und Fehler im Code der Seite. Dateinamen, Dateiinhalte, genaue Größen, die Fehlermeldungen gescheiterter Umwandlungen und Pässe werden nie gesendet, und was du eingibst, wird nicht erfasst. Unser Worker meldet außerdem, ohne deine IP-Adresse, fertige Bildumwandlungen und Videoaufträge mit Zielformat und Verfahren sowie seine eigenen Fehler.</p>
+<p>Das Skript setzt keine Cookies und speichert nichts auf deinem Gerät. PostHog bildet auf seinen Servern aus deiner IP-Adresse und Angaben deines Browsers eine täglich wechselnde ID, sodass Besuche am selben Tag zusammen gezählt werden können, aber nicht über Tage hinweg. Außerdem leitet PostHog aus der IP-Adresse einen ungefähren Standort ab (Land und Stadt). Es gibt keine Sitzungsaufzeichnung.</p>
+<p>PostHog Inc., 2261 Market St. #4008, San Francisco, CA 94114, USA, speichert diese Daten für uns auf Servern in den USA und verarbeitet sie als unser Auftragsverarbeiter auf Grundlage eines Auftragsverarbeitungsvertrags (Art. 28 DSGVO). PostHog ist nach dem EU-US Data Privacy Framework zertifiziert, für das die Europäische Kommission einen Angemessenheitsbeschluss erlassen hat (Art. 45 DSGVO); der Vertrag enthält zusätzlich die EU-Standardvertragsklauseln. Wir löschen die Statistik spätestens nach 12 Monaten. Rechtsgrundlage ist unser berechtigtes Interesse, convert zu verbessern und Fehler zu beheben (Art. 6 Abs. 1 lit. f DSGVO). Ein Inhaltsblocker oder der Tracking-Schutz deines Browsers kann das Skript aufhalten; convert funktioniert ohne es genauso. Mehr dazu in der <a href="https://posthog.com/privacy" rel="noopener">Datenschutzerklärung von PostHog</a>.</p>
+
+`;
+
 function privacyEn(o: Operator, host: string) {
-  return `<p>convert has no accounts and sets no cookies. There is no tracking or advertising, no analysis of visitors or their behavior, and no automated decision-making about you. Nothing is kept in your browser's storage. This policy covers the personal data that is processed nonetheless when you use ${esc(host)}: your IP address, and the files you choose to convert on Cloudflare along with their names.</p>
+  return `<p>convert has no accounts and sets no cookies. ${o.analytics ? `There is no advertising, no profiling and no automated decision-making about you. We do count, without cookies and without knowing who you are, how convert is used, as described under "Usage statistics".` : "There is no tracking or advertising, no analysis of visitors or their behavior, and no automated decision-making about you."} Nothing is kept in your browser's storage. This policy covers the personal data that is processed nonetheless when you use ${esc(host)}: your IP address, and the files you choose to convert on Cloudflare along with their names.</p>
 
 <h2>Controller</h2>
 ${address(o, "en")}
@@ -90,7 +106,7 @@ ${o.passes ? `<h2>Passes from stem</h2>
 <p>Videos are uploaded either to our storage at Cloudflare (Cloudflare R2, for MP4 files up to 100 MB) or straight from your browser to Cloudflare Stream (upload.videodelivery.net, for every other video). The original is deleted as soon as the conversion is done, a copy in Stream as soon as the result is saved, and an upload whose conversion never starts after 3 hours at the latest. The result stays in our storage for at most 24 hours and can be downloaded by anyone who has its link, which contains a long random ID. While a video is being converted we keep a job record with the file name, the chosen settings, the progress and the daily hashed connection described under "Hosting". Job records are deleted after 2 days.</p>
 <p>We don't look at the files you convert and don't use them for anything else. The legal basis is the conversion you ask for (Art. 6(1)(b) GDPR). Cloudflare processes the files as our processor, as described under "Hosting". Please don't upload files whose content you aren't allowed to share with a service provider.</p>
 
-<h2>Email</h2>
+${o.analytics ? USAGE_EN : ""}<h2>Email</h2>
 <p>If you email us, we use your address and message only to reply (Art. 6(1)(f) GDPR) and delete them once the matter is settled, unless the law requires us to keep them.</p>
 
 <h2>Your rights</h2>
@@ -101,7 +117,7 @@ ${o.passes ? `<h2>Passes from stem</h2>
 }
 
 function privacyDe(o: Operator, host: string) {
-  return `<p>convert hat keine Benutzerkonten und setzt keine Cookies. Es verwendet keine Tracking- oder Werbedienste, wertet weder Besucher noch ihr Verhalten aus und trifft keine automatisierten Entscheidungen über dich. Im Speicher deines Browsers legt convert nichts ab. Diese Erklärung beschreibt, welche personenbezogenen Daten trotzdem verarbeitet werden, wenn du ${esc(host)} nutzt: deine IP-Adresse und die Dateien, die du bei Cloudflare umwandeln lässt, samt ihren Namen.</p>
+  return `<p>convert hat keine Benutzerkonten und setzt keine Cookies. ${o.analytics ? "Es verwendet keine Werbedienste, erstellt keine Profile und trifft keine automatisierten Entscheidungen über dich. Wie convert genutzt wird, zählen wir ohne Cookies und ohne zu wissen, wer du bist, wie unter „Nutzungsstatistik“ beschrieben." : "Es verwendet keine Tracking- oder Werbedienste, wertet weder Besucher noch ihr Verhalten aus und trifft keine automatisierten Entscheidungen über dich."} Im Speicher deines Browsers legt convert nichts ab. Diese Erklärung beschreibt, welche personenbezogenen Daten trotzdem verarbeitet werden, wenn du ${esc(host)} nutzt: deine IP-Adresse und die Dateien, die du bei Cloudflare umwandeln lässt, samt ihren Namen.</p>
 
 <h2>Verantwortlicher</h2>
 ${address(o, "de")}
@@ -127,7 +143,7 @@ ${o.passes ? `<h2>Pässe von stem</h2>
 <p>Videos werden entweder in unseren Speicher bei Cloudflare hochgeladen (Cloudflare R2, für MP4-Dateien bis 100 MB) oder direkt aus deinem Browser zu Cloudflare Stream (upload.videodelivery.net, für alle anderen Videos). Das Original wird gelöscht, sobald die Umwandlung fertig ist, eine Kopie in Stream, sobald das Ergebnis gespeichert ist, und ein Upload, dessen Umwandlung nie beginnt, spätestens nach 3 Stunden. Das Ergebnis bleibt höchstens 24 Stunden in unserem Speicher und kann von allen heruntergeladen werden, die seinen Link haben; der Link enthält eine lange Zufalls-ID. Während ein Video umgewandelt wird, führen wir einen Auftragseintrag mit Dateiname, gewählten Einstellungen, Fortschritt und dem unter „Hosting“ beschriebenen täglichen Hash der Verbindung. Auftragseinträge werden nach 2 Tagen gelöscht.</p>
 <p>Wir sehen uns die Dateien, die du umwandelst, nicht an und nutzen sie für nichts anderes. Rechtsgrundlage ist die Umwandlung, die du anforderst (Art. 6 Abs. 1 lit. b DSGVO). Cloudflare verarbeitet die Dateien als unser Auftragsverarbeiter, wie unter „Hosting“ beschrieben. Bitte lade keine Dateien hoch, deren Inhalt du nicht an einen Dienstleister weitergeben darfst.</p>
 
-<h2>E-Mail</h2>
+${o.analytics ? USAGE_DE : ""}<h2>E-Mail</h2>
 <p>Wenn du uns schreibst, nutzen wir deine Adresse und Nachricht nur, um dir zu antworten (Art. 6 Abs. 1 lit. f DSGVO), und löschen sie, sobald die Sache erledigt ist, es sei denn, das Gesetz verpflichtet uns zur Aufbewahrung.</p>
 
 <h2>Deine Rechte</h2>
@@ -165,13 +181,14 @@ export function legalPage(slug: string, env: Env, origin: string) {
   const o: Operator = operator(env);
   o.passes = passIssuer(env) ? new URL(passIssuer(env)!).host : null;
   o.logs = logRegion(env.POSTHOG_LOGS);
+  o.analytics = !!phKey(env);
   const host = new URL(origin).host;
   const back = p.lang === "de" ? "Zurück zu convert" : "Back to convert";
   return `<!doctype html>
 <html lang="${p.lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(p.title)} · convert.</title><meta name="robots" content="noindex">
 <link rel="canonical" href="${esc(origin + "/" + slug)}"><link rel="alternate" hreflang="${p.lang === "de" ? "en" : "de"}" href="${esc(origin + "/" + p.other)}">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/fonts.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/fonts.css">${phScriptTag(env)}
 <style>body{margin:0;font:16px/1.65 "General Sans",system-ui,sans-serif;color:#1A1216;background:#F6F1EE;padding:clamp(28px,6vw,72px) clamp(20px,5vw,56px)}
 main{max-width:720px;margin:0 auto}h1{font:600 clamp(32px,6vw,52px)/1.05 "Clash Display",system-ui,sans-serif;letter-spacing:-.03em;margin:18px 0 10px}h1 span{color:#FF2E52}
 h2{font:600 22px/1.2 "Clash Display",system-ui,sans-serif;letter-spacing:-.01em;margin:40px 0 10px}address{font-style:normal;margin:0 0 1em}

@@ -2,7 +2,9 @@
 // Copyright (C) 2026 shiftbloom studio and contributors
 // Bindings, variables and secrets of the Worker (see wrangler.jsonc).
 
-export interface Env {
+import type { PostHogEnv } from "./posthog.ts";
+
+export interface Env extends PostHogEnv {
   FILES: R2Bucket;
   DB: D1Database;
   IMAGES: ImagesBinding;
