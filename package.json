@@ -26,5 +26,8 @@
   "type": "module",
   "engines": {
     "node": ">=26"
+  },
+  "overrides": {
+    "sjcl": "1.0.9"
   }
 }
