@@ -9,8 +9,8 @@ Before converting, people choose where it happens. "On Cloudflare" is faster and
 | Input | On Cloudflare | In the browser |
 | --- | --- | --- |
 | Images (PNG, JPG, WebP, AVIF, GIF, HEIC) | PNG, JPG, WebP or AVIF through the Images binding, with quality and maximum width | PNG, JPG or WebP |
-| Video (MP4, MOV, WebM, MKV and more) | MP4 (H.264), M4A audio or a still frame through Media Transformations or Stream | MP4, WebM, GIF, MP3 or a still frame |
-| Audio (MP3, WAV, FLAC, OGG and more) | not offered | MP3, WAV, OGG or M4A |
+| Video (MP4, MOV, WebM, MKV and more) | MP4 (H.264), M4A audio or a still frame through Media Transformations or Stream | MP4, WebM, GIF, MP3 or a still frame. MP3 is offered in both modes and always runs in the browser, because Cloudflare only extracts M4A |
+| Audio (MP3, WAV, FLAC, OGG and more) | not offered | MP3, WAV, OGG, M4A, or an MP4 that shows a cover image (JPG, PNG or WebP, up to 20 MB and 50 megapixels) for the length of the track |
 
 ## Features
 
@@ -122,7 +122,7 @@ Set the var `POSTHOG_LOGS` to `eu` or `us` so the privacy policy names PostHog a
 
 With the secret `POSTHOG_KEY` (a PostHog project token, `npx wrangler secret put POSTHOG_KEY`; region via the var `POSTHOG_HOST`, default `https://us.i.posthog.com`), the converter pages and the legal pages load `/_sb/init.js`. It loads posthog-js through `/_sb/*` on convert's own origin, so the CSP needs no new hosts. posthog-js runs cookieless, without session replay; autocapture only records clicks on buttons and links with text masked; job URLs and every path that isn't a converter or legal page are reported as `/[private]`. Turn on cookieless tracking in the PostHog project settings.
 
-The page sends `files_added` (counts by kind), `conversion_started`, `conversion_completed` and `conversion_failed` (kind, extension, target, cloud or browser, duration class). The Worker sends `image_converted`, `video_job_created`, `video_job_done`, `video_job_failed` and `$exception`, without IP or person profile. File names, sizes, contents and passes are never sent. The privacy policy gains a "Usage statistics" section (EN and DE).
+The page sends `files_added` (counts by kind), `conversion_started`, `conversion_completed` and `conversion_failed` (kind, extension, target, cloud or browser, duration class). Audio turned into a cover video shows up there as the target `cover`. The Worker sends `image_converted`, `video_job_created`, `video_job_done`, `video_job_failed` and `$exception`, without IP or person profile. File names, sizes, contents and passes are never sent. The privacy policy gains a "Usage statistics" section (EN and DE).
 
 ## Development
 
