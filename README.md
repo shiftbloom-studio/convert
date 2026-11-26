@@ -1,7 +1,10 @@
 # convert.
 
-A small, open file converter for images, video and audio, running on Cloudflare.
-Live at **[convert.shiftbloom.studio](https://convert.shiftbloom.studio)** - free, no account, results deleted after 24 hours.
+Convert images, video and audio in the browser. No sign-up, and files are deleted within 24 hours.
+
+**Live:** [convert.shiftbloom.studio](https://convert.shiftbloom.studio), free and without an account · **License:** AGPL-3.0-or-later
+
+A small, open file converter running on Cloudflare.
 
 Drop files, pick a target format, download. Every format is labelled either **cloud** (converted on Cloudflare) or **local** (converted in your browser with ffmpeg.wasm - nothing is uploaded).
 
@@ -12,6 +15,14 @@ Drop files, pick a target format, download. Every format is labelled either **cl
 | Audio (MP3, WAV, FLAC, OGG …) | – | MP3, WAV, OGG, M4A |
 
 The UI is in German; contributions for other languages are welcome.
+
+## Features
+
+- Image conversion on Cloudflare with resize and quality settings. Nothing is stored.
+- Cloud video jobs for MP4, M4A and still frames, run as durable Workflows with retries and live progress.
+- Local video and audio conversion in your browser with ffmpeg.wasm, so those files never leave your device.
+- Turnstile, per-IP rate limits and daily quotas to keep the free service usable and its costs predictable.
+- No accounts, no analytics and no cookies. Inputs and results are deleted after at most 24 hours.
 
 ## How it works
 
@@ -48,9 +59,15 @@ browser ──▶ Worker (src/index.ts)
 Images 25 MB · cloud video 100 MB (MP4 fast path) or 200 MB (Stream), max. 10 minutes · local conversions are limited by browser memory.
 Per-IP and global daily quotas are configured in `wrangler.jsonc` (`vars`) to keep costs predictable.
 
+## Tech stack
+
+- TypeScript, checked with `tsc` and bundled by Wrangler. ffmpeg.wasm runs in a web worker in the browser.
+- Cloudflare Workers with Workflows, R2, D1, Images, Media Transformations, Stream, Turnstile, rate limiting and a Cron Trigger
+- Node.js 26 for builds and checks
+
 ## Self-hosting
 
-You need a Cloudflare account with Workers Paid (for Workflows), R2, Images and Stream enabled, plus Node.js 20+.
+You need a Cloudflare account with Workers Paid (for Workflows), R2, Images and Stream enabled, plus Node.js 26.
 
 ```sh
 git clone https://github.com/shiftbloom-studio/convert && cd convert
@@ -74,12 +91,16 @@ npm run deploy
 To use your own domain, uncomment `routes` in `wrangler.jsonc`.
 Rate-limit `namespace_id`s must be unique per account - change them if they collide with another Worker.
 
-### Local development
+### Deploy with Workers Builds
+
+convert.shiftbloom.studio deploys with Workers Builds on every push to `main`, and no API token is stored on GitHub. Connect the repository to the Worker in the Cloudflare dashboard (Settings > Build). Keep the D1 database id out of the repository: let the build command fill it into a deploy config from a build variable, and deploy that config with `npx wrangler deploy --keep-vars`, so the vars you set in the dashboard stay. The build picks up Node 26 from `.node-version`.
+
+## Development
 
 ```sh
 cp .dev.vars.example .dev.vars   # Turnstile test secret
 npm run dev                      # wrangler dev --remote (Images, Media and Stream need remote bindings)
-npm run check                    # syntax check
+npm run check                    # typecheck, then a syntax check of the browser code
 npm run build                    # wrangler dry run into dist/
 ```
 
@@ -93,7 +114,11 @@ npm run build                    # wrangler dry run into dist/
 
 ## Contributing
 
-Issues and pull requests are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately, see [SECURITY.md](SECURITY.md).
+Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+Please don't report vulnerabilities in public issues. Use GitHub's private vulnerability reporting on this repository or email [safety@shiftbloom.studio](mailto:safety@shiftbloom.studio). [SECURITY.md](SECURITY.md) has the details.
 
 ## License
 
@@ -105,3 +130,7 @@ If you run a modified version as a network service, the AGPL requires you to off
 
 Third-party components keep their own licenses: ffmpeg.wasm (`@ffmpeg/core`, GPL-2.0-or-later including x264) is loaded at runtime from jsDelivr and is not part of this repository; the brand typefaces are served under their own licenses (ITF Free Font License, SIL OFL).
 Brand assets (the Bloom mark, wordmark and typefaces) are not covered by the AGPL; please don't use them for forks.
+
+---
+
+convert is part of [shiftbloom studio](https://shiftbloom.studio), an open studio from Hamburg. All of our apps are open source at [github.com/shiftbloom-studio](https://github.com/shiftbloom-studio).
