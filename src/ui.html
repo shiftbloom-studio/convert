@@ -520,11 +520,12 @@ function addFiles(files) {
     const el = document.createElement("div");
     el.className = "item";
     el.innerHTML = `<div class="thumb"></div>
-      <div style="min-width:0"><div class="name"></div><div class="meta"><span class="num">${fmtSize(f.size)}</span><span class="tag"></span><span class="status" role="status"></span></div>
+      <div style="min-width:0"><div class="name"></div><div class="meta"><span class="num"></span><span class="tag"></span><span class="status" role="status"></span></div>
       <div class="track" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"></div><div class="dot"></div></div></div>
       <div class="into"><span class="label">Turn it into</span><div class="chips" role="radiogroup"></div><button class="btn ghost small fix" hidden></button></div>
       <div class="actions"><select aria-label="Target format"></select><button class="x" title="Remove" aria-label="Remove">×</button></div>`;
     $(".name", el).textContent = f.name;
+    $(".num", el).textContent = fmtSize(f.size);
     $(".chips", el).setAttribute("aria-label", "Turn " + f.name + " into");
     $(".thumb", el).textContent = ext(f.name).slice(0, 4) || "?";
     const it = { file: f, kind, ext: ext(f.name), mode: null, state: "idle", el, sel: $("select", el) };
