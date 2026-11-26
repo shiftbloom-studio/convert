@@ -29,7 +29,11 @@ const VIDEO_TARGETS = {
 
 const json = (data, status = 200, headers = {}) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", ...headers } });
-const err = (message, status = 400, detail) => json({ error: message, detail }, status);
+// The raw cause goes to the Worker logs only, never to the browser.
+const err = (message, status = 400, cause) => {
+  if (cause !== undefined) console.error(message, cause);
+  return json({ error: message }, status);
+};
 const now = () => Date.now();
 const QUOTA_MSG = "Cloudflare is done for today on this connection. Your browser can still convert files, or come back tomorrow.";
 const today = () => new Date().toISOString().slice(0, 10);
@@ -267,8 +271,9 @@ export class ConvertJob extends WorkflowEntrypoint {
       return { ok: true };
     } catch (e) {
       await step.do("fail", async () => {
-        // Stored as "<message for people>\n<raw detail>"; publicJob splits it again.
+        // Stored as "<message for people>\n<raw detail>"; publicJob only returns the first line.
         const raw = String(e.message || e).slice(0, 300);
+        console.error("convert-job failed", id, raw);
         const msg = raw.startsWith("too-long")
           ? "This video is longer than 10 minutes and Cloudflare stops at 10. Pick an in-browser format instead. It's slower but has no time limit."
           : raw.startsWith("timeout")
@@ -318,7 +323,7 @@ async function handleImage(req, env, url) {
   try {
     info = await env.IMAGES.info(stream());
   } catch (e) {
-    return err("This image is damaged or not really an image.", 415, String(e.message || e));
+    return err("This image is damaged or not really an image.", 415, e);
   }
   if (!(info.width > 0 && info.height > 0)) return err("This image is damaged or not really an image.", 415);
   if (info.width * info.height > IMAGE_PIXELS || info.width > IMAGE_SIDE || info.height > IMAGE_SIDE)
@@ -332,7 +337,7 @@ async function handleImage(req, env, url) {
       headers: { ...FILE_HEADERS, "content-type": IMAGE_FORMATS[format], "content-disposition": `attachment; filename="${name}"` },
     });
   } catch (e) {
-    return err("Something went wrong. Try again in a moment.", 422, String(e.message || e));
+    return err("Something went wrong. Try again in a moment.", 422, e);
   }
 }
 
@@ -431,7 +436,7 @@ async function handleUpload(req, env, id, url) {
 function publicJob(job) {
   return {
     id: job.id, engine: job.engine, status: job.status, progress: job.progress, step: job.step,
-    error: job.error ? job.error.split("\n")[0] : null, detail: job.error ? job.error.split("\n").slice(1).join("\n") : null, outputName: job.output_name, outputSize: job.output_size,
+    error: job.error ? job.error.split("\n")[0] : null, outputName: job.output_name, outputSize: job.output_size,
     download: job.status === "done" ? `/api/jobs/${job.id}/download` : null,
   };
 }
