@@ -12,6 +12,15 @@ Before converting, people choose where it happens. "On Cloudflare" is faster and
 | Video (MP4, MOV, WebM, MKV and more) | MP4 (H.264), M4A audio or a still frame through Media Transformations or Stream | MP4, WebM, GIF, MP3 or a still frame |
 | Audio (MP3, WAV, FLAC, OGG and more) | not offered | MP3, WAV, OGG or M4A |
 
+## Features
+
+- Image conversion on Cloudflare with quality and maximum width. Images are never stored.
+- Cloud video jobs for MP4, M4A and still frames, run as durable Workflows with retries and live progress.
+- Local image, video and audio conversion in the browser with ffmpeg.wasm, so those files never leave the device.
+- Eight format pages such as `/heic-to-jpg`, plus a sitemap, `robots.txt` and `llms.txt`.
+- Turnstile, origin checks, file signature checks, per-IP rate limits and daily quotas to keep the free service usable and its costs predictable.
+- No accounts, no analytics and no cookies. Inputs and results are deleted after at most 24 hours.
+
 ## How it works
 
 ```
@@ -56,6 +65,12 @@ The per-IP and global daily quotas live in `wrangler.jsonc` under `vars` and kee
 
 `src/pages.js` holds the copy for the start page and eight format pages such as `/heic-to-jpg`. Each page loads the same converter with a preset target and adds its own article, canonical URL, Open Graph tags and JSON-LD. The Worker also serves `/sitemap.xml`, `/robots.txt`, `/llms.txt`, `/og.png` and an HTML 404 page. All URLs are built from the request's origin, so they follow your own domain.
 
+## Tech stack
+
+- Plain JavaScript modules bundled by Wrangler, with the UI in one HTML file. ffmpeg.wasm runs in a web worker in the browser.
+- Cloudflare Workers with Workflows, R2, D1, Images, Media Transformations, Stream, Turnstile, rate limiting and a Cron Trigger
+- Node.js 26 for builds and checks
+
 ## Self-hosting
 
 You need a Cloudflare account with Workers Paid (for Workflows), R2, Images and Stream enabled, plus Node.js 26.
@@ -85,7 +100,7 @@ To use your own domain, uncomment `routes` in `wrangler.jsonc`. Rate-limit `name
 
 convert.shiftbloom.studio deploys with Workers Builds on every push to `main`, and no API token is stored on GitHub. Connect the repository to the Worker in the Cloudflare dashboard (Settings > Build). Keep the D1 database id out of the repository: let the build command fill it into a deploy config from a build variable, and deploy that config with `npx wrangler deploy --keep-vars`, so the vars you set in the dashboard stay. The build picks up Node 26 from `.node-version`.
 
-### Local development
+## Development
 
 ```sh
 cp .dev.vars.example .dev.vars   # Turnstile test secret
