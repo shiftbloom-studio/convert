@@ -133,7 +133,7 @@ export const PAGES: Page[] = [
     h2: "What ends up in the video",
     body: [
       "The picture is your cover, shown once per second, which is all a still image needs. H.264 stores the repeats as almost nothing, so the picture adds less than 1 MB to a four-minute song. The sound is encoded again as AAC at 192 kbit/s, the format video sites expect.",
-      "Covers can be JPG, PNG or WebP, up to 20 MB. A big cover is scaled down to fit inside 1920 pixels, square art stays square, and a max width above the list shrinks it further. Drop several tracks with one image and they all get that cover. Each row also has a button to choose a different one.",
+      "Covers can be JPG, PNG or WebP, up to 20 MB. A big cover is scaled down to fit inside 1920 pixels, square art stays square, and a max width set above shrinks it further. Drop several tracks with one image and they all get that cover. Each row also has a button to choose a different one.",
       "ffmpeg does all of it in this tab, so the unreleased mix stays on your computer. Tracks can be up to two hours long. The first time, your browser downloads ffmpeg once, about 30 MB.",
     ],
   },

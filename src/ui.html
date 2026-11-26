@@ -400,9 +400,13 @@ const LOCAL = {
   webpl: { ext: "webp", type: "image/webp", args: (o) => [...scale(o, -1), "-frames:v", "1", "-c:v", "libwebp", "-quality", String(o.quality)] },
   // Audio plus a still image as a video, for platforms that only take video. One frame per second
   // keeps the encode short; the picture fits inside 1920 px (or the max width) with even sides for H.264.
-  cover: { ext: "mp4", type: "video/mp4", extra: (it) => [{ file: it.cover.file, pre: ["-loop", "1", "-framerate", "1"] }],
+  // The cover goes to ffmpeg under a fixed name that matches its sniffed type, never the user's file name.
+  cover: { ext: "mp4", type: "video/mp4", extra: (it) => [{ file: new File([it.cover.file], "cover." + it.cover.type), pre: ["-loop", "1", "-framerate", "1"] }],
     // -shortest alone overshoots a looped image by a few seconds, so the track's length is set when known.
-    args: (o, it) => { const w = Math.min(o.width || 1920, 3840); return ["-map", "1:v:0", "-map", "0:a:0", ...(it.duration > 0 ? ["-t", it.duration.toFixed(3)] : []),
+    // Without a known length the video still stops at 2 hours.
+    args: (o, it) => { const w = Math.max(LIM.coverMin, Math.min(Math.round(o.width) || 1920, 3840));
+      const t = it.duration > 0 ? Math.min(it.duration, LIM.coverSeconds) : LIM.coverSeconds;
+      return ["-map", "1:v:0", "-map", "0:a:0", "-t", t.toFixed(3),
       "-vf", `scale='min(${w},iw)':'min(${w},ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p`,
       "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-crf", "20", "-r", "1", "-g", "10",
       "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart"]; } },
@@ -628,12 +632,13 @@ async function setCover(it, f, auto) {
   if (it.state === "busy" || it.state === "done") return;
   const no = (msg) => { it.cover = null; it.coverMsg = msg; if (!auto) setStatus(it, msg); refresh(it); };
   if (f.size > LIM.image) return no(`This image is ${fmtSize(f.size)}. Covers can be up to 20 MB.`);
-  if (!(await sniffCover(f))) return no("That cover isn't a JPG, PNG or WebP.");
+  const type = await sniffCover(f);
+  if (!type) return no("That cover isn't a JPG, PNG or WebP.");
   const d = await coverSize(f);
   if (!d || !(d.w > 0 && d.h > 0)) return no("This cover image is damaged or not really an image.");
   if (d.w * d.h > LIM.coverPixels || d.w > LIM.coverSide || d.h > LIM.coverSide) return no(`This cover is ${d.w} × ${d.h} pixels. Covers can be up to 50 megapixels and 12,000 pixels per side.`);
   if (d.w < LIM.coverMin || d.h < LIM.coverMin) return no("This cover is too small. Use one with at least 64 pixels per side.");
-  it.cover = { file: f }; it.coverMsg = "";
+  it.cover = { file: f, type }; it.coverMsg = "";
   $(".thumb", it.el).replaceChildren(d.img);
   if (it.sel.value !== "cover") pickChip(it, "cover");
   refresh(it);
