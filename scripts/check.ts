@@ -1,24 +1,19 @@
-// Syntax check for the Worker and the inline browser script, without a bundler.
+// Syntax check for the browser scripts the Worker serves as text (the web worker, the passes
+// client and the inline script of ui.html), without a bundler. The Worker itself is TypeScript
+// and checked by `tsc` (npm run typecheck).
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const dir = mkdtempSync(join(tmpdir(), "convert-check-"));
-const files = [];
+const files: [name: string, src: string][] = [];
 
-const worker = readFileSync("src/index.js", "utf8")
-  .replace(/^import \{ WorkflowEntrypoint \}.*$/m, "class WorkflowEntrypoint {}")
-  .replace(/^import (\w+) from "\.\/.*";$/gm, 'const $1 = "";');
-files.push(["worker.mjs", worker]);
 files.push(["ffworker.js", readFileSync("src/ffworker.js.txt", "utf8")]);
-files.push(["pages.mjs", readFileSync("src/pages.js", "utf8")]);
-files.push(["legal.mjs", readFileSync("src/legal.js", "utf8")]);
-files.push(["passes.mjs", readFileSync("src/passes.js", "utf8")]);
 files.push(["passes.client.js", readFileSync("src/passes.client.js", "utf8")]);
 const html = readFileSync("src/ui.html", "utf8");
 // Inline <script> bodies, found by plain string scanning (ui.html only uses attribute-less tags).
-const scripts = [];
+const scripts: string[] = [];
 for (let from = 0; ; ) {
   const start = html.indexOf("<script>", from);
   if (start < 0) break;

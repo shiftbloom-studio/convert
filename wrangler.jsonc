@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "convert",
-  "main": "src/index.js",
+  "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
   "observability": { "enabled": true },
 
@@ -25,7 +25,7 @@
   "media": { "binding": "MEDIA" },
   "stream": { "binding": "STREAM" },
   "workflows": [{ "binding": "CONVERT_JOB", "name": "convert-job", "class_name": "ConvertJob" }],
-  // Passes (src/passes.js): spent passes, one object per issuer key.
+  // Passes (src/passes.ts): spent passes, one object per issuer key.
   "durable_objects": { "bindings": [{ "name": "SPENT", "class_name": "SpentPasses" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SpentPasses"] }],
   // When stem runs on the same Cloudflare account, fetch its keys through a service binding:

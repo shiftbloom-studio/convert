@@ -3,9 +3,11 @@
 // Copy and metadata for the start page and the format landing pages.
 // Each format page loads the same converter with a preset target and adds its own article.
 
+import type { Home, Page } from "./types.ts";
+
 export const REPO = "https://github.com/shiftbloom-studio/convert";
 
-export const HOME = {
+export const HOME: Home = {
   slug: "",
   title: "Free file converter for images, video and audio · convert.",
   desc: "Turn HEIC photos into JPGs and MOV clips into MP4s. Images and video go through Cloudflare and are deleted after 24 hours. Everything else is converted inside your browser and never uploaded.",
@@ -14,7 +16,7 @@ export const HOME = {
   example: { name: "IMG_2041.HEIC", to: "jpg", a: "3.1 MB", b: "840 KB", where: "cloud" },
 };
 
-export const FAQ = [
+export const FAQ: [question: string, answer: string][] = [
   ["Are my files stored?", "Images are not. Cloudflare converts them and sends them straight back. Videos and their results sit in Cloudflare R2 for at most 24 hours and are then deleted automatically."],
   ["Which formats never leave my device?", "WebM, GIF, MP3, WAV and OGG are made by ffmpeg.wasm in your browser. If you switch to “In your browser” before converting, images and MP4 videos stay on your device as well."],
   ["How big can a file be?", "On Cloudflare, images can be up to 20 MB and videos up to 200 MB and ten minutes long. In your browser there is no fixed limit, only the memory of your device."],
@@ -22,7 +24,7 @@ export const FAQ = [
   ["What does it cost?", "Nothing. To keep the bill predictable there is a daily allowance of __IMG_DAY__ images and __JOB_DAY__ videos per connection."],
 ];
 
-export const PAGES = [
+export const PAGES: Page[] = [
   {
     slug: "heic-to-jpg",
     link: "HEIC to JPG",
