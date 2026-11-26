@@ -14,6 +14,8 @@ files.push(["worker.mjs", worker]);
 files.push(["ffworker.js", readFileSync("src/ffworker.js.txt", "utf8")]);
 files.push(["pages.mjs", readFileSync("src/pages.js", "utf8")]);
 files.push(["legal.mjs", readFileSync("src/legal.js", "utf8")]);
+files.push(["passes.mjs", readFileSync("src/passes.js", "utf8")]);
+files.push(["passes.client.js", readFileSync("src/passes.client.js", "utf8")]);
 const html = readFileSync("src/ui.html", "utf8");
 // Inline <script> bodies, found by plain string scanning (ui.html only uses attribute-less tags).
 const scripts = [];

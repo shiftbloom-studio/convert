@@ -6,10 +6,11 @@
 // shows its own operator. The text describes exactly what src/index.js, src/ui.html and the
 // Workflow do with a visitor's data: update it whenever they change. Keep both languages in step.
 
+import { passIssuer } from "./passes.js";
+
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 const COUNTRIES = { DE: ["Germany", "Deutschland"], AT: ["Austria", "Österreich"], CH: ["Switzerland", "Schweiz"] };
-
 function operator(env) {
   const c = COUNTRIES[(env.LEGAL_COUNTRY || "").toUpperCase()] || [env.LEGAL_COUNTRY || "", env.LEGAL_COUNTRY || ""];
   return {
@@ -74,7 +75,10 @@ ${address(o, "en")}
 <h2>Converting in your browser</h2>
 <p>When a file is set to "In your browser", FFmpeg runs on your device and the file never leaves it. Neither we nor Cloudflare see the file, its name or the result. FFmpeg itself is loaded from our server, so no third party learns that you use it.</p>
 
-<h2>Bot check</h2>
+${o.passes ? `<h2>Passes from stem</h2>
+<p>If you have an account at stem (${o.passes}), you can get passes there: each one is one more conversion on Cloudflare once your connection's free ones for the day are used up. When you ask for passes, your browser sends stem blinded requests, together with your stem sign-in. stem signs them without being able to read them, so neither stem nor we can tell later which pass belongs to which account. Your browser keeps the passes in this site's local storage until it spends them or they expire after one to two days; storing them there is strictly necessary for what you asked for (§ 25(2) no. 2 TDDDG). When a pass comes with a conversion, our Worker checks stem's signature and records the pass in our database so it can't be used twice, and deletes that record after three days. We learn nothing about you from a pass. stem's own privacy policy explains what stem stores. The legal basis is our legitimate interest in sharing a free service fairly without tracking anyone (Art. 6(1)(f) GDPR).</p>
+
+` : ""}<h2>Bot check</h2>
 <p>Before the first conversion on Cloudflare, and only then, your browser loads Cloudflare Turnstile from challenges.cloudflare.com. Turnstile reads signals from your browser and device, such as the IP address, the user agent and how the browser behaves, to tell people from automated scripts. According to Cloudflare it processes only the data needed for this, and it doesn't read or send what you enter or upload. Our Worker asks Cloudflare whether the check passed. For images it then gives your browser a key that is valid for 20 minutes and is tied to your connection; the key stays in the memory of the open page and isn't stored anywhere. Reading these signals is strictly necessary for the conversion you asked for (§ 25(2) no. 2 TDDDG). The legal basis is our legitimate interest in keeping automated abuse away from a free service (Art. 6(1)(f) GDPR). More in Cloudflare's <a href="${TS}" rel="noopener">Turnstile privacy addendum</a>.</p>
 
 <h2>Converting on Cloudflare</h2>
@@ -108,7 +112,10 @@ ${address(o, "de")}
 <h2>Umwandeln im Browser</h2>
 <p>Steht eine Datei auf „In your browser“, läuft FFmpeg auf deinem Gerät und die Datei verlässt es nicht. Weder wir noch Cloudflare sehen die Datei, ihren Namen oder das Ergebnis. FFmpeg selbst wird von unserem Server geladen, kein Dritter erfährt also, dass du es nutzt.</p>
 
-<h2>Bot-Prüfung</h2>
+${o.passes ? `<h2>Pässe von stem</h2>
+<p>Wenn du ein Konto bei stem (${o.passes}) hast, kannst du dort Pässe holen: Jeder Pass ist eine weitere Umwandlung bei Cloudflare, sobald die kostenlosen deiner Verbindung für heute verbraucht sind. Wenn du Pässe anforderst, schickt dein Browser stem verblendete Anfragen, zusammen mit deiner Anmeldung bei stem. stem signiert sie, ohne sie lesen zu können, sodass weder stem noch wir später erkennen, welcher Pass zu welchem Konto gehört. Dein Browser bewahrt die Pässe im lokalen Speicher dieser Seite auf, bis er sie einlöst oder sie nach ein bis zwei Tagen ablaufen; das Speichern dort ist für das, worum du gebeten hast, unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG). Kommt ein Pass mit einer Umwandlung, prüft unser Worker die Signatur von stem und vermerkt den Pass in unserer Datenbank, damit er nicht zweimal eingelöst wird, und löscht diesen Vermerk nach drei Tagen. Aus einem Pass erfahren wir nichts über dich. Was stem speichert, steht in der Datenschutzerklärung von stem. Rechtsgrundlage ist unser berechtigtes Interesse, einen kostenlosen Dienst fair zu verteilen, ohne jemanden zu verfolgen (Art. 6 Abs. 1 lit. f DSGVO).</p>
+
+` : ""}<h2>Bot-Prüfung</h2>
 <p>Vor der ersten Umwandlung bei Cloudflare, und nur dann, lädt dein Browser Cloudflare Turnstile von challenges.cloudflare.com. Turnstile liest Signale deines Browsers und Geräts, etwa die IP-Adresse, den User-Agent und wie sich der Browser verhält, um Menschen von automatisierten Skripten zu unterscheiden. Nach Angaben von Cloudflare verarbeitet es dafür nur die nötigen Daten und liest oder sendet nichts von dem, was du eingibst oder hochlädst. Unser Worker fragt bei Cloudflare nach, ob die Prüfung bestanden ist. Für Bilder gibt er deinem Browser danach einen Schlüssel, der 20 Minuten gilt und an deine Verbindung gebunden ist; er liegt nur im Arbeitsspeicher der geöffneten Seite und wird nirgends gespeichert. Das Auslesen dieser Signale ist für die von dir gewünschte Umwandlung unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG). Rechtsgrundlage ist unser berechtigtes Interesse, automatisierten Missbrauch von einem kostenlosen Dienst fernzuhalten (Art. 6 Abs. 1 lit. f DSGVO). Mehr dazu im <a href="${TS}" rel="noopener">Turnstile Privacy Addendum</a> von Cloudflare.</p>
 
 <h2>Umwandeln bei Cloudflare</h2>
@@ -138,6 +145,7 @@ export const LEGAL = {
 export function legalPage(slug, env, origin) {
   const p = LEGAL[slug];
   const o = operator(env);
+  o.passes = passIssuer(env) ? new URL(passIssuer(env)).host : null;
   const host = new URL(origin).host;
   const back = p.lang === "de" ? "Zurück zu convert" : "Back to convert";
   return `<!doctype html>
