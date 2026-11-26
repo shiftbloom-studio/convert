@@ -61,6 +61,12 @@ On Cloudflare, images can be up to 20 MB, which is the input limit of the Images
 
 The per-IP and global daily quotas live in `wrangler.jsonc` under `vars` and keep the bill predictable.
 
+### Passes
+
+The per-connection allowance punishes everyone behind a shared connection. People signed in at a [stem](https://github.com/shiftbloom-studio/stem) issuer can get passes: anonymous [Privacy Pass](https://www.rfc-editor.org/rfc/rfc9578) tokens, 50 a day, one per conversion once the connection's free ones are used up. The browser blinds each pass before stem signs it (`src/passes.client.js`, no dependencies), so neither stem nor convert can tell later whose pass it was. The Worker checks stem's signature with the key from stem's issuer directory and a Durable Object per key remembers spent passes (`src/passes.js`). The global daily caps still apply.
+
+Set `PASS_ISSUER` to stem's origin and add convert's origin to that stem's `PASS_ORIGINS`. On the same Cloudflare account, also bind stem as `STEM` (see `wrangler.jsonc`) so the Worker doesn't fetch keys over the public hostname. Without `PASS_ISSUER` nothing changes.
+
 ### SEO and pages
 
 `src/pages.js` holds the copy for the start page and eight format pages such as `/heic-to-jpg`. Each page loads the same converter with a preset target and adds its own article, canonical URL, Open Graph tags and JSON-LD. The Worker also serves `/sitemap.xml`, `/robots.txt`, `/llms.txt`, `/og.png` and an HTML 404 page. All URLs are built from the request's origin, so they follow your own domain.
@@ -105,7 +111,7 @@ convert.shiftbloom.studio deploys with Workers Builds on every push to `main`, a
 ```sh
 cp .dev.vars.example .dev.vars   # Turnstile test secret
 npm run dev                      # wrangler dev --remote (Images, Media and Stream need remote bindings)
-npm run check                    # syntax check
+npm run check                    # syntax check and tests
 npm run build                    # wrangler dry run into dist/
 ```
 

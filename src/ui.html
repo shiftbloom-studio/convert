@@ -114,6 +114,8 @@ input[type=number]:hover,select:hover{border-color:var(--ink45)}
 .check input{accent-color:var(--bloom);width:16px;height:16px}
 .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .quota{font-size:13px;color:var(--ink60);margin:10px 0 0}
+.quota .link{background:none;border:0;padding:0;font:inherit;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.quota .link:disabled{color:var(--ink45);cursor:default}
 #ts:not(:empty){margin-top:4px}
 
 .list{display:flex;flex-direction:column}
@@ -264,6 +266,7 @@ footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
     <div id="ts"></div>
   </div>
   <p class="quota" id="quota" hidden></p>
+  <p class="quota" id="passes" hidden></p>
 
   __ARTICLE__
 
@@ -313,6 +316,7 @@ footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
   <nav class="legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/datenschutz" hreflang="de" lang="de">Datenschutz</a><a href="/imprint">Imprint</a><a href="/impressum" hreflang="de" lang="de">Impressum</a></nav>
 </footer>
 
+<script src="/passes.js"></script>
 <script>
 const SITEKEY = "__SITEKEY__";
 const PRESET = __PRESET__;
@@ -563,12 +567,57 @@ function updateBar() {
   $("#quota").hidden = !$("#quota").textContent || !live.some((i) => modeOf(i) === "cloud");
   document.body.classList.toggle("busy", items.some((i) => i.state === "busy"));
 }
+let quotaLeft = null;
 async function loadQuota() {
   try {
     const q = await (await fetch("/api/quota", { cache: "no-store" })).json();
+    quotaLeft = q;
     $("#quota").textContent = `Cloudflare can still do ${q.images} images and ${q.videos} videos for you today.`;
+    if (q.passes) showPasses();
   } catch { $("#quota").textContent = ""; }
   updateBar();
+}
+
+// Passes from stem (see /passes.js): once this connection's free conversions are gone, each pass buys
+// one more. stem vouches for the person; convert never learns who they are.
+const passesOn = () => !!(quotaLeft && quotaLeft.passes && window.convertPasses);
+let passNote = "";
+async function showPasses() {
+  const el = $("#passes");
+  if (!passesOn() || !(await convertPasses.config())) { el.hidden = true; return; }
+  const n = convertPasses.count();
+  const btn = document.createElement("button");
+  btn.className = "link"; btn.type = "button";
+  btn.textContent = n ? "Get more" : "Get 50 more for today";
+  btn.onclick = getPasses;
+  const text = n ? `You also have ${n} ${n === 1 ? "pass" : "passes"} from stem. They take over when the free ones run out. ` : "Signed in at stem? ";
+  const tail = n ? "" : " stem vouches for you, and convert never learns who you are.";
+  el.replaceChildren(text, btn, tail + (passNote ? " " + passNote : ""));
+  el.hidden = false;
+}
+async function getPasses() {
+  const btn = $("#passes .link");
+  if (btn) { btn.disabled = true; btn.textContent = "Getting passes …"; }
+  try {
+    const r = await convertPasses.refill(50);
+    if (r.signIn) { location.assign(r.signIn); return; }
+    passNote = r.error ? r.error : r.added ? "" : "stem didn't hand out passes right now.";
+  } catch { passNote = "Couldn't reach stem. Try again in a moment."; }
+  showPasses();
+}
+/** A pass for the next request, but only when the free allowance for this kind is used up. */
+const passFor = (kind) => (passesOn() && quotaLeft[kind] <= 0 ? convertPasses.take() : null);
+const passHeader = (p) => (p ? { authorization: `PrivateToken token="${p}"` } : {});
+/** After a refused request: was it the free allowance (try a pass) or a pass that didn't work (try another)? */
+function retryWithPass(status, j, kind, hadPass) {
+  if (!passesOn()) return null;
+  if (status === 429 && j.code === "quota" && !j.scope && !hadPass) { quotaLeft[kind] = 0; return convertPasses.take(); }
+  if (status === 401 && j.code === "pass") return convertPasses.take();
+  return null;
+}
+if (new URLSearchParams(location.search).has("passes")) {
+  history.replaceState(null, "", location.pathname);
+  fetch("/api/quota", { cache: "no-store" }).then((r) => r.json()).then((q) => { quotaLeft = q; if (q.passes) getPasses(); }).catch(() => {});
 }
 
 const actionsOf = (it) => [it.sel, $(".x", it.el)];
@@ -610,12 +659,13 @@ async function convertImage(it, fmt) {
   const o = options();
   const q = new URLSearchParams({ format: fmt, quality: o.quality });
   if (o.width) q.set("width", o.width);
-  const send = async (fresh) => {
+  const send = async (fresh, pass) => {
     setP(it, 0.01, "Checking you're human …");
     const token = await imageSession(fresh);
     const x = new XMLHttpRequest();
     x.open("POST", "/api/image?" + q);
     x.setRequestHeader("x-convert-session", token);
+    for (const [k, v] of Object.entries(passHeader(pass))) x.setRequestHeader(k, v);
     x.responseType = "blob";
     x.upload.onprogress = (e) => e.lengthComputable && setP(it, (e.loaded / e.total) * 0.7, "Uploading " + pct(e.loaded / e.total));
     x.upload.onload = () => setP(it, 0.8, "Converting …");
@@ -624,9 +674,14 @@ async function convertImage(it, fmt) {
     if (x.status !== 200) try { j = JSON.parse(await x.response.text()); } catch {}
     return { x, j };
   };
-  let { x, j } = await send(false);
-  if (x.status === 401 && j.code === "session") ({ x, j } = await send(true));
+  let pass = passFor("images");
+  let { x, j } = await send(false, pass);
+  if (x.status === 401 && j.code === "session") ({ x, j } = await send(true, pass));
+  for (let tries = 0; x.status !== 200 && tries < 2 && (pass = retryWithPass(x.status, j, "images", !!pass)); tries++) ({ x, j } = await send(false, pass));
+  if (x.status === 429 && j.scope === "global") convertPasses.giveBack?.(pass);
+  if (passesOn()) showPasses();
   if (x.status !== 200) throw E(j.error || "Something went wrong. Try again in a moment.", j.detail || "HTTP " + x.status);
+  if (quotaLeft && !pass) quotaLeft.images = Math.max(0, quotaLeft.images - 1);
   const name = it.file.name.replace(/\.[^.]+$/, "") + "." + (fmt === "jpeg" ? "jpg" : fmt);
   finish(it, URL.createObjectURL(x.response), name, x.response.size);
 }
@@ -683,11 +738,18 @@ const serialToken = () => (tsChain = tsChain.then(turnstileToken, turnstileToken
 
 async function convertVideoCloud(it, target) {
   const o = options();
-  setP(it, 0.01, "Checking you're human …");
-  const token = await serialToken();
-  const r = await fetch("/api/jobs", { method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: it.file.name, size: it.file.size, type: it.file.type, target, width: o.width, mute: o.mute, turnstile: token }) });
-  const job = await r.json().catch(() => ({}));
+  const create = async (pass) => {
+    setP(it, 0.01, "Checking you're human …");
+    const token = await serialToken();
+    const r = await fetch("/api/jobs", { method: "POST", headers: { "content-type": "application/json", ...passHeader(pass) },
+      body: JSON.stringify({ name: it.file.name, size: it.file.size, type: it.file.type, target, width: o.width, mute: o.mute, turnstile: token }) });
+    return { r, job: await r.json().catch(() => ({})) };
+  };
+  let pass = passFor("videos");
+  let { r, job } = await create(pass);
+  for (let tries = 0; !r.ok && tries < 2 && (pass = retryWithPass(r.status, job, "videos", !!pass)); tries++) ({ r, job } = await create(pass));
+  if (r.status === 429 && job.scope === "global") convertPasses.giveBack?.(pass);
+  if (passesOn()) showPasses();
   if (!r.ok) throw E(job.error || "Something went wrong. Try again in a moment.", job.detail || "HTTP " + r.status);
   const up = job.upload;
   const onUp = (p) => setP(it, p * 0.4, "Uploading " + pct(p));

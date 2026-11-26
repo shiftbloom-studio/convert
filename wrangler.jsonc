@@ -13,7 +13,7 @@
   "preview_urls": false,
 
   "rules": [
-    { "type": "Text", "globs": ["**/*.html", "**/*.txt"], "fallthrough": true },
+    { "type": "Text", "globs": ["**/*.html", "**/*.txt", "**/*.client.js"], "fallthrough": true },
     { "type": "Data", "globs": ["**/*.png"], "fallthrough": true }
   ],
   "triggers": { "crons": ["17 * * * *"] },
@@ -25,6 +25,11 @@
   "media": { "binding": "MEDIA" },
   "stream": { "binding": "STREAM" },
   "workflows": [{ "binding": "CONVERT_JOB", "name": "convert-job", "class_name": "ConvertJob" }],
+  // Passes (src/passes.js): spent passes, one object per issuer key.
+  "durable_objects": { "bindings": [{ "name": "SPENT", "class_name": "SpentPasses" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SpentPasses"] }],
+  // When stem runs on the same Cloudflare account, fetch its keys through a service binding:
+  // "services": [{ "binding": "STEM", "service": "stem" }],
   "ratelimits": [
     { "name": "IMG_LIMIT", "namespace_id": "4101", "simple": { "limit": 20, "period": 60 } },
     { "name": "JOB_LIMIT", "namespace_id": "4102", "simple": { "limit": 3, "period": 60 } }
@@ -37,6 +42,10 @@
     "IMAGE_DAILY_GLOBAL": "2000",
     "JOB_DAILY_PER_IP": "10",
     "JOB_DAILY_GLOBAL": "200",
+    // Passes from a stem issuer (https://github.com/shiftbloom-studio/stem): signed-in people convert past
+    // the per-connection allowance without convert learning who they are. Empty turns them off.
+    // e.g. "https://stem.example.com"; that stem needs this site in its PASS_ORIGINS.
+    "PASS_ISSUER": "",
     // Operator shown on /imprint and /privacy (§ 5 DDG, Art. 13 GDPR). Fill these in for your
     // deployment, for example in the dashboard; the pages say so while they're empty.
     // LEGAL_COUNTRY is a code (DE, AT, CH) or a name. LEGAL_PHONE and LEGAL_VAT_ID are optional.

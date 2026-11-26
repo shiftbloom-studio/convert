@@ -7,6 +7,10 @@ import FFWORKER from "./ffworker.js.txt";
 import OG from "./og.png";
 import { HOME, FAQ, PAGES, REPO } from "./pages.js";
 import { LEGAL, legalPage } from "./legal.js";
+import PASSES_JS from "./passes.client.js";
+import { spendPass, unspendPass, passConfig, passIssuer, SpentPasses } from "./passes.js";
+
+export { SpentPasses };
 
 const MB = 1024 * 1024;
 const LIMITS = {
@@ -37,6 +41,20 @@ const err = (message, status = 400, cause) => {
 const now = () => Date.now();
 const QUOTA_MSG = "Cloudflare is done for today on this connection. Your browser can still convert files, or come back tomorrow.";
 const today = () => new Date().toISOString().slice(0, 10);
+const PASS_MSG = "That pass didn't work. It may be used up or expired.";
+
+// A pass from stem stands in for this connection's daily allowance (see passes.js). The global
+// daily caps still apply to everyone. Returns null when it's fine to go on, or an error response.
+async function takeDaily(req, env, url, kind, perIp, global, ip) {
+  const pass = await spendPass(req, env, url);
+  if (pass && !pass.ok) return json({ error: PASS_MSG, code: "pass", reason: pass.reason }, 401);
+  if (!pass && !(await takeQuota(env, kind + ":" + ip, perIp))) return json({ error: QUOTA_MSG, code: "quota" }, 429);
+  if (!(await takeQuota(env, kind + ":global", global))) {
+    if (pass) await unspendPass(env, pass); // the pass bought nothing, so it stays usable
+    return json({ error: QUOTA_MSG, code: "quota", scope: "global" }, 429);
+  }
+  return null;
+}
 
 const enc = (v) => new TextEncoder().encode(v);
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -313,8 +331,8 @@ async function handleImage(req, env, url) {
   const bytes = await readLimited(req.body, LIMITS.imageBytes);
   if (!bytes) return err("This image is over 20 MB. Cloudflare takes up to 20 MB.", 413);
   if (!sniffImage(bytes)) return err("This doesn't look like an image convert can read. Try PNG, JPG, WebP, GIF, AVIF or HEIC.", 415);
-  if (!(await takeQuota(env, "img:" + ip, +env.IMAGE_DAILY_PER_IP))) return err(QUOTA_MSG, 429);
-  if (!(await takeQuota(env, "img:global", +env.IMAGE_DAILY_GLOBAL))) return err(QUOTA_MSG, 429);
+  const daily = await takeDaily(req, env, url, "img", +env.IMAGE_DAILY_PER_IP, +env.IMAGE_DAILY_GLOBAL, ip);
+  if (daily) return daily;
 
   const quality = Math.min(100, Math.max(1, +url.searchParams.get("quality") || 85));
   const width = +url.searchParams.get("width") || 0;
@@ -361,8 +379,8 @@ async function createJob(req, env, url) {
   else if (VIDEO_TARGETS[target].mode === "frame") return err("Cloudflare only takes still frames from MP4s up to 100 MB. Your browser can do it with any video.");
   else return err(`This video is ${(size / MB).toFixed(1)} MB. Cloudflare takes up to 200 MB.`, 413);
 
-  if (!(await takeQuota(env, "job:" + ip, +env.JOB_DAILY_PER_IP))) return err(QUOTA_MSG, 429);
-  if (!(await takeQuota(env, "job:global", +env.JOB_DAILY_GLOBAL))) return err(QUOTA_MSG, 429);
+  const daily = await takeDaily(req, env, url, "job", +env.JOB_DAILY_PER_IP, +env.JOB_DAILY_GLOBAL, ip);
+  if (daily) return daily;
 
   const id = crypto.randomUUID();
   const options = JSON.stringify({ target, width: Math.min(+width || 0, 2000) || undefined, mute: !!mute, time: /^\d+(\.\d+)?s$/.test(time || "") ? time : undefined });
@@ -441,11 +459,12 @@ function publicJob(job) {
   };
 }
 
-const CSP = [
+const csp = (env) => [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com blob:",
   "worker-src 'self' blob:",
-  "connect-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com blob: data:",
+  // The pass issuer (stem), when passes are on: the page fetches passes from it.
+  `connect-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com${passIssuer(env) ? " " + passIssuer(env) : ""} blob: data:`,
   "img-src 'self' blob: data:",
   "media-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
@@ -652,10 +671,10 @@ async function quota(req, env) {
     .bind(today(), "img:" + ip, "job:" + ip).all();
   const used = Object.fromEntries(results.map((r) => [r.subject, r.units]));
   const left = (kind, perIp, global) => Math.max(0, Math.min(+perIp - (used[kind + ":" + ip] || 0), +global - (used[kind + ":global"] || 0)));
-  return json({ images: left("img", env.IMAGE_DAILY_PER_IP, env.IMAGE_DAILY_GLOBAL), videos: left("job", env.JOB_DAILY_PER_IP, env.JOB_DAILY_GLOBAL) }, 200, { "cache-control": "no-store" });
+  return json({ images: left("img", env.IMAGE_DAILY_PER_IP, env.IMAGE_DAILY_GLOBAL), videos: left("job", env.JOB_DAILY_PER_IP, env.JOB_DAILY_GLOBAL), passes: !!passIssuer(env) }, 200, { "cache-control": "no-store" });
 }
 
-const HTML_HEADERS = { "content-type": "text/html; charset=utf-8", "content-security-policy": CSP, "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin" };
+const htmlHeaders = (env) => ({ "content-type": "text/html; charset=utf-8", "content-security-policy": csp(env), "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin" });
 
 async function route(req, env, ctx) {
   const url = new URL(req.url);
@@ -664,17 +683,23 @@ async function route(req, env, ctx) {
 
   const origin = url.origin;
   if (m === "GET" && (p === "/" || p === "/index.html"))
-    return new Response(renderPage(null, env, origin), { headers: { ...HTML_HEADERS, "cache-control": "public, max-age=300" } });
+    return new Response(renderPage(null, env, origin), { headers: { ...htmlHeaders(env), "cache-control": "public, max-age=300" } });
   if (m === "GET" && BY_SLUG[p.slice(1)])
-    return new Response(renderPage(BY_SLUG[p.slice(1)], env, origin), { headers: { ...HTML_HEADERS, "cache-control": "public, max-age=300" } });
+    return new Response(renderPage(BY_SLUG[p.slice(1)], env, origin), { headers: { ...htmlHeaders(env), "cache-control": "public, max-age=300" } });
   if (m === "GET" && p.length > 1 && p.endsWith("/") && BY_SLUG[p.slice(1, -1)]) return Response.redirect(origin + p.slice(0, -1), 301);
   if (m === "GET" && p === "/sitemap.xml") return new Response(sitemap(origin), { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
   if (m === "GET" && p === "/robots.txt") return new Response(robots(origin), { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
   if (m === "GET" && p === "/llms.txt") return new Response(llms(origin, env), { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
   if (m === "GET" && p === "/og.png") return new Response(OG, { headers: { "content-type": "image/png", "cache-control": "public, max-age=604800" } });
   if (m === "GET" && p === "/api/quota") return quota(req, env);
+  if (m === "GET" && p === "/api/passes/config") {
+    const c = await passConfig(env, url).catch((e) => (console.error("pass config", e), null));
+    return c ? json(c, 200, { "cache-control": "no-store" }) : err("Passes aren't on here.", 404);
+  }
+  if (m === "GET" && p === "/passes.js")
+    return new Response(PASSES_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=3600", "x-content-type-options": "nosniff" } });
   if (m === "GET" && LEGAL[p.slice(1)])
-    return new Response(legalPage(p.slice(1), env, origin), { headers: { ...HTML_HEADERS, "cache-control": "public, max-age=3600" } });
+    return new Response(legalPage(p.slice(1), env, origin), { headers: { ...htmlHeaders(env), "cache-control": "public, max-age=3600" } });
   if (m === "GET" && (p === "/vendor/ffmpeg-core.js" || p === "/vendor/ffmpeg-core.wasm")) return vendor(p.slice(8));
   if (m === "GET" && p === "/ffworker.js")
     return new Response(FFWORKER, { headers: { "content-type": "text/javascript", "cache-control": "public, max-age=3600" } });
@@ -716,7 +741,7 @@ async function route(req, env, ctx) {
     }
   }
   if (p.startsWith("/api/")) return err("Not found.", 404);
-  return new Response(NOT_FOUND(url.origin), { status: 404, headers: { ...HTML_HEADERS, "cache-control": "public, max-age=300" } });
+  return new Response(NOT_FOUND(url.origin), { status: 404, headers: { ...htmlHeaders(env), "cache-control": "public, max-age=300" } });
 }
 
 export default {
