@@ -25,6 +25,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/fonts.css">
 <script type="application/ld+json">__JSONLD__</script>
+__POSTHOG__
 <style>
 :root{
   --bloom:#FF2E52;--root:#C81040;--petal:#FF8FAB;--blush:#FFE9EF;--ink:#1A1216;--paper:#F6F1EE;--warm:#EEE6E2;
@@ -327,6 +328,7 @@ const fmtSize = (b) => b >= MB ? (b / MB).toFixed(1) + " MB" : Math.max(1, Math.
 const ext = (n) => (n.includes(".") ? n.split(".").pop() : "").toLowerCase();
 const isMp4 = (f) => f.type === "video/mp4" || /\.(mp4|m4v)$/i.test(f.name);
 const E = (msg, detail) => Object.assign(new Error(msg), { detail });
+const capture = (event, properties) => window.posthog?.capture(event, properties);
 
 // ---- The Bloom: the exact mark from shiftbloom.studio (four petal rings + seed, 10·10·8·6),
 // gradient from 32px up, solid Bloom Red below. Plus the sprinkles, from the brand spec.
@@ -528,7 +530,9 @@ function readDuration(it) {
   v.onerror = done; v.src = url;
 }
 
-function addFiles(files) {
+function addFiles(files, source) {
+  const added = [...files].map(kindOf).filter(Boolean);
+  if (added.length) capture("files_added", { source, file_count: added.length, file_types: [...new Set(added)] });
   for (const f of files) {
     const kind = kindOf(f);
     const el = document.createElement("div");
@@ -635,6 +639,7 @@ if (new URLSearchParams(location.search).has("passes")) {
 
 const actionsOf = (it) => [it.sel, $(".x", it.el)];
 function fail(it, e, m) {
+  capture("conversion_failed", { conversion_mode: m, input_type: it.kind, output_format: outOf(it, it.selMode, it.sel.value) });
   it.state = "error"; it.el.classList.remove("busy"); it.el.classList.add("err"); it.sel.disabled = false;
   setP(it, 1); setStatus(it, e.message || String(e), e.detail || "");
   // Offer the other place when it can take this file.
@@ -648,6 +653,8 @@ function finish(it, href, name, size, note) {
   setP(it, 1, note || "Done.");
   if (size && !note) $(".num", it.el).textContent = fmtSize(it.file.size) + " → " + fmtSize(size);
   const a = document.createElement("a"); a.className = "btn primary small dl"; a.href = href; a.download = name; a.textContent = "Download";
+  a.onclick = () => capture("conversion_downloaded", { conversion_mode: modeOf(it), input_type: it.kind, output_format: outOf(it, it.selMode, it.sel.value) });
+  capture("conversion_completed", { conversion_mode: modeOf(it), input_type: it.kind, output_format: outOf(it, it.selMode, it.sel.value) });
   const again = document.createElement("button"); again.className = "btn ghost small"; again.textContent = "Another format";
   again.onclick = () => { it.state = "idle"; it.el.classList.remove("done"); $(".actions", it.el).replaceChildren(...actionsOf(it)); it.sel.disabled = false; setP(it, 0); refresh(it); const c = $(".chip[aria-checked=true]", it.el); if (c) c.focus(); };
   $(".actions", it.el).replaceChildren(again, a, $(".x", it.el));
@@ -807,6 +814,7 @@ async function convert(it) {
   if (!canGo(it)) return;
   it.state = "busy"; it.el.classList.remove("err", "blocked"); it.el.classList.add("busy"); it.sel.disabled = true; showFix(it, null); updateBar();
   const target = it.sel.value, m = modeOf(it);
+  capture("conversion_started", { conversion_mode: m, input_type: it.kind, output_format: outOf(it, it.selMode, target) });
   try {
     if (m === "local") await convertLocal(it, target);
     else if (it.kind === "image") await convertImage(it, target);
@@ -828,11 +836,11 @@ document.querySelectorAll("input[name=mode]").forEach((r) => r.onchange = () => 
 const drop = $("#drop"), input = $("#file");
 drop.onclick = () => input.click();
 drop.onkeydown = (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), input.click());
-input.onchange = () => { addFiles(input.files); input.value = ""; };
+input.onchange = () => { addFiles(input.files, "file_picker"); input.value = ""; };
 drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
 drop.ondragleave = () => drop.classList.remove("over");
-drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); };
-document.addEventListener("paste", (e) => e.clipboardData.files.length && addFiles([...e.clipboardData.files]));
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files, "drag_and_drop"); };
+document.addEventListener("paste", (e) => e.clipboardData.files.length && addFiles([...e.clipboardData.files], "clipboard"));
 addEventListener("beforeunload", (e) => { if (items.some((i) => i.state === "busy")) { e.preventDefault(); e.returnValue = ""; } });
 </script>
 </body>

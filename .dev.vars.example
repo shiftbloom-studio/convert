@@ -1,3 +1,7 @@
 # Copy to .dev.vars for local development (`npm run dev`). Never commit .dev.vars.
 # Cloudflare's Turnstile test secret: every token passes.
 TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+
+# PostHog browser analytics. Set the same public values as Cloudflare Worker variables in production.
+POSTHOG_PROJECT_TOKEN=phc_your_public_project_token
+POSTHOG_HOST=https://your-posthog-host

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 shiftbloom studio and contributors
 import { WorkflowEntrypoint } from "cloudflare:workers";
+import { PostHog } from "posthog-node";
 import HTML from "./ui.html";
 import { faviconSvg } from "./bloom.js";
 import FFWORKER from "./ffworker.js.txt";
@@ -33,6 +34,45 @@ const VIDEO_TARGETS = {
 
 const json = (data, status = 200, headers = {}) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", ...headers } });
+
+const posthogClients = new WeakMap();
+const posthogConfigWarnings = new WeakSet();
+function posthogClient(env, origin) {
+  const token = env.POSTHOG_PROJECT_TOKEN?.trim();
+  const host = env.POSTHOG_HOST?.trim().replace(/\/$/, "");
+  if (!token || !host) {
+    if ((origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) && !posthogConfigWarnings.has(env)) {
+      const variable = token ? "POSTHOG_HOST" : "POSTHOG_PROJECT_TOKEN";
+      console.warn(`${variable} variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once ${variable} is configured`);
+      posthogConfigWarnings.add(env);
+    }
+    return null;
+  }
+  let client = posthogClients.get(env);
+  if (!client) {
+    client = new PostHog(token, {
+      host,
+      enableExceptionAutocapture: true,
+      logs: { serviceName: "convert-worker" },
+      flushAt: 1,
+      flushInterval: 0,
+      requestTimeout: 2000,
+      fetchRetryCount: 0,
+    });
+    posthogClients.set(env, client);
+  }
+  return client;
+}
+
+async function posthogLog(env, origin, level, body, attributes) {
+  const client = posthogClient(env, origin);
+  if (!client) return;
+  try {
+    client.logger[level](body, attributes);
+    await client.flush().catch(() => {});
+  } catch {}
+}
+
 // The raw cause goes to the Worker logs only, never to the browser.
 const err = (message, status = 400, cause) => {
   if (cause !== undefined) console.error(message, cause);
@@ -351,6 +391,7 @@ async function handleImage(req, env, url) {
     if (width > 0) t = t.transform({ width: Math.min(width, IMAGE_SIDE), fit: "scale-down" });
     const out = await t.output({ format: IMAGE_FORMATS[format], quality, anim: format === "webp" ? undefined : false });
     const name = "image." + (format === "jpeg" ? "jpg" : format);
+    await posthogLog(env, url.origin, "info", "cloud_image_conversion_completed", { output_format: format });
     return out.response({
       headers: { ...FILE_HEADERS, "content-type": IMAGE_FORMATS[format], "content-disposition": `attachment; filename="${name}"` },
     });
@@ -400,6 +441,7 @@ async function createJob(req, env, url) {
   await env.DB.prepare(
     "INSERT INTO jobs (id, kind, engine, status, progress, step, input_name, input_key, stream_uid, options, ip_hash, created_at, updated_at) VALUES (?1, 'video', ?2, 'uploading', 0, 'Uploading', ?3, ?4, ?5, ?6, ?7, ?8, ?8)"
   ).bind(id, engine, String(name || "video").slice(0, 200), `in/${id}`, streamUid, options, ip, now()).run();
+  await posthogLog(env, url.origin, "info", "video_conversion_job_created", { engine, output_format: target });
   return json({ id, engine, upload });
 }
 
@@ -448,6 +490,7 @@ async function handleUpload(req, env, id, url) {
   })();
   await Promise.all([env.FILES.put(`in/${id}`, readable, { httpMetadata: { contentType: "video/mp4" } }), pump]);
   await startWorkflow(env, id);
+  await posthogLog(env, url.origin, "info", "video_conversion_queued", { engine: "media" });
   return json({ ok: true });
 }
 
@@ -459,12 +502,14 @@ function publicJob(job) {
   };
 }
 
+const posthogHost = (env) => env.POSTHOG_HOST?.trim().replace(/\/$/, "");
+
 const csp = (env) => [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com blob:",
+  `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${posthogHost(env) ? " " + posthogHost(env) : ""} blob:`,
   "worker-src 'self' blob:",
   // The pass issuer (stem), when passes are on: the page fetches passes from it.
-  `connect-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com${passIssuer(env) ? " " + passIssuer(env) : ""} blob: data:`,
+  `connect-src 'self' https://*.videodelivery.net https://*.cloudflarestream.com${passIssuer(env) ? " " + passIssuer(env) : ""}${posthogHost(env) ? " " + posthogHost(env) : ""} blob: data:`,
   "img-src 'self' blob: data:",
   "media-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
@@ -533,6 +578,19 @@ const BY_SLUG = Object.fromEntries(PAGES.map((p) => [p.slug, p]));
 const fill = (tpl, map) => tpl.replace(/__([A-Z0-9]+)__/g, (m, k) => (k in map ? map[k] : m));
 const faqText = (a, env) => a.replace("__IMG_DAY__", env.IMAGE_DAILY_PER_IP).replace("__JOB_DAY__", env.JOB_DAILY_PER_IP);
 
+function posthogScript(env, origin) {
+  const token = env.POSTHOG_PROJECT_TOKEN?.trim();
+  const host = posthogHost(env);
+  if (!token || !host) {
+    if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) {
+      const variable = token ? "POSTHOG_HOST" : "POSTHOG_PROJECT_TOKEN";
+      return `<script>throw new Error(${ldJson(`${variable} variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once ${variable} is configured`)})</script>`;
+    }
+    return "";
+  }
+  return `<script src="${esc(host + "/static/array.js")}"></script><script>posthog.init(${ldJson(token)}, { api_host: ${ldJson(host)} })</script>`;
+}
+
 function app(origin) {
   return {
     "@type": "WebApplication",
@@ -599,6 +657,7 @@ function renderPage(page, env, origin) {
     LINKS: links,
     PRESET: ldJson(page ? page.preset : null),
     SITEKEY: esc(env.TURNSTILE_SITEKEY),
+    POSTHOG: posthogScript(env, origin),
   });
 }
 
@@ -750,6 +809,11 @@ export default {
       return await route(req, env, ctx);
     } catch (e) {
       console.error(e);
+      const posthog = posthogClient(env, new URL(req.url).origin);
+      if (posthog) {
+        posthog.captureException(e, "anonymous");
+        await posthog.flush().catch(() => {});
+      }
       return err("Something went wrong. Try again in a moment.", 500);
     }
   },

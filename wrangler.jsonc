@@ -3,6 +3,7 @@
   "name": "convert",
   "main": "src/index.js",
   "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
   // Serve on your own hostname by uncommenting (the zone must be on your Cloudflare account):

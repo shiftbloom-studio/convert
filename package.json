@@ -29,5 +29,8 @@
   },
   "overrides": {
     "sjcl": "1.0.9"
+  },
+  "dependencies": {
+    "posthog-node": "^6.2.0"
   }
 }
