@@ -72,7 +72,7 @@ ${address(o, "en")}
 <p>To prevent abuse, the Worker counts conversions per connection: per minute in the memory of Cloudflare's rate limiter, and per day in our database. Neither count holds your IP address. Both use a keyed hash of it that changes every day and can't be traced back to the address without our secret key. The daily counts are deleted after 7 days.</p>
 <p>The legal basis is our legitimate interest in running convert securely and reliably (Art. 6(1)(f) GDPR). Cloudflare processes the data as our processor under a data processing agreement (Art. 28 GDPR). Cloudflare, Inc. is certified under the EU-U.S. Data Privacy Framework, for which the European Commission has adopted an adequacy decision (Art. 45 GDPR); the agreement also contains the EU standard contractual clauses. More in ${CF_EN}.</p>
 
-<h2>Converting in your browser</h2>
+${o.logs ? errorLogsEn(o.logs) : ""}<h2>Converting in your browser</h2>
 <p>When a file is set to "In your browser", FFmpeg runs on your device and the file never leaves it. Neither we nor Cloudflare see the file, its name or the result. FFmpeg itself is loaded from our server, so no third party learns that you use it.</p>
 
 ${o.passes ? `<h2>Passes from stem</h2>
@@ -109,7 +109,7 @@ ${address(o, "de")}
 <p>Um Missbrauch zu verhindern, zählt der Worker Umwandlungen pro Verbindung: pro Minute im Arbeitsspeicher von Cloudflares Rate-Limiter und pro Tag in unserer Datenbank. Keine der beiden Zählungen enthält deine IP-Adresse. Beide nutzen einen mit einem geheimen Schlüssel gebildeten Hash davon, der sich täglich ändert und sich ohne unseren geheimen Schlüssel nicht auf die Adresse zurückführen lässt. Die Tageszählungen werden nach 7 Tagen gelöscht.</p>
 <p>Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren und zuverlässigen Betrieb von convert (Art. 6 Abs. 1 lit. f DSGVO). Cloudflare verarbeitet die Daten als unser Auftragsverarbeiter auf Grundlage eines Auftragsverarbeitungsvertrags (Art. 28 DSGVO). Cloudflare, Inc. ist nach dem EU-U.S. Data Privacy Framework zertifiziert, für das ein Angemessenheitsbeschluss der Europäischen Kommission besteht (Art. 45 DSGVO); der Vertrag enthält zusätzlich die EU-Standardvertragsklauseln. Mehr dazu in der ${CF_DE}.</p>
 
-<h2>Umwandeln im Browser</h2>
+${o.logs ? errorLogsDe(o.logs) : ""}<h2>Umwandeln im Browser</h2>
 <p>Steht eine Datei auf „In your browser“, läuft FFmpeg auf deinem Gerät und die Datei verlässt es nicht. Weder wir noch Cloudflare sehen die Datei, ihren Namen oder das Ergebnis. FFmpeg selbst wird von unserem Server geladen, kein Dritter erfährt also, dass du es nutzt.</p>
 
 ${o.passes ? `<h2>Pässe von stem</h2>
@@ -133,7 +133,18 @@ ${o.passes ? `<h2>Pässe von stem</h2>
 <p><strong>Du kannst der Verarbeitung deiner personenbezogenen Daten auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO jederzeit aus Gründen widersprechen, die sich aus deiner besonderen Situation ergeben (Art. 21 DSGVO).</strong></p>`;
 }
 
-const UPDATED = { en: "Last updated 25 November 2026", de: "Stand: 25. November 2026" };
+const UPDATED = { en: "Last updated 26 November 2026", de: "Stand: 26. November 2026" };
+
+// Set POSTHOG_LOGS to "eu" or "us" when the Worker's logs are exported to PostHog (see README).
+const LOG_REGION = { eu: { en: "the EU (Frankfurt)", de: "in der EU (Frankfurt)" }, us: { en: "the USA", de: "in den USA" } };
+const logRegion = (v) => LOG_REGION[String(v ?? "").trim().toLowerCase()] ?? null;
+const errorLogsEn = (where) => `<h2>Logs at PostHog</h2>
+<p>The request logs described under "Hosting" (IP address, approximate location, the address requested and details your browser sends) and the error messages our Worker writes (such as which step failed and the technical ID of the file or conversion concerned) are also sent to PostHog Inc., 2261 Market St. #4008, San Francisco, CA 94114, USA, which stores them for us on servers in ${where.en}. They contain no file contents. We use them only to fix errors and to prevent abuse, and PostHog deletes them after 14 days. The legal basis is our legitimate interest in running convert securely and reliably (Art. 6(1)(f) GDPR). PostHog processes the data as our processor under a data processing agreement (Art. 28 GDPR) that contains the EU standard contractual clauses. More in <a href="https://posthog.com/privacy" rel="noopener">PostHog's privacy policy</a>.</p>
+`;
+const errorLogsDe = (where) => `<h2>Protokolle bei PostHog</h2>
+<p>Die unter „Hosting“ beschriebenen Anfrageprotokolle (IP-Adresse, ungefährer Standort, aufgerufene Adresse und Angaben, die dein Browser mitsendet) und die Fehlermeldungen, die unser Worker schreibt (etwa welcher Schritt fehlgeschlagen ist und die technische ID der betroffenen Datei oder Umwandlung), werden außerdem an PostHog Inc., 2261 Market St. #4008, San Francisco, CA 94114, USA, gesendet, die sie für uns auf Servern ${where.de} speichert. Sie enthalten keine Dateiinhalte. Wir nutzen sie nur, um Fehler zu beheben und Missbrauch zu verhindern, und PostHog löscht sie nach 14 Tagen. Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren und zuverlässigen Betrieb von convert (Art. 6 Abs. 1 lit. f DSGVO). PostHog verarbeitet die Daten als unser Auftragsverarbeiter auf Grundlage eines Auftragsverarbeitungsvertrags (Art. 28 DSGVO), der die EU-Standardvertragsklauseln enthält. Mehr dazu in der <a href="https://posthog.com/privacy" rel="noopener">Datenschutzerklärung von PostHog</a>.</p>
+`;
+
 
 export const LEGAL = {
   privacy: { lang: "en", title: "Privacy policy", other: "datenschutz", otherLabel: "Deutsch", body: privacyEn, updated: true },
@@ -146,6 +157,7 @@ export function legalPage(slug, env, origin) {
   const p = LEGAL[slug];
   const o = operator(env);
   o.passes = passIssuer(env) ? new URL(passIssuer(env)).host : null;
+  o.logs = logRegion(env.POSTHOG_LOGS);
   const host = new URL(origin).host;
   const back = p.lang === "de" ? "Zurück zu convert" : "Back to convert";
   return `<!doctype html>

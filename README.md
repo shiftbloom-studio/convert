@@ -106,6 +106,16 @@ To use your own domain, uncomment `routes` in `wrangler.jsonc`. Rate-limit `name
 
 convert.shiftbloom.studio deploys with Workers Builds on every push to `main`, and no API token is stored on GitHub. Connect the repository to the Worker in the Cloudflare dashboard (Settings > Build). Keep the D1 database id out of the repository: let the build command fill it into a deploy config from a build variable, and deploy that config with `npx wrangler deploy --keep-vars`, so the vars you set in the dashboard stay. The build picks up Node 26 from `.node-version`.
 
+### Logs in PostHog
+
+Workers Logs can be exported over OpenTelemetry without code changes. Create a logs destination under Workers & Pages > Observability > Destinations with the URL `https://eu.i.posthog.com/i/v1/logs` (or `us.i.posthog.com`) and the header `Authorization: Bearer <your PostHog project token>`, then add it to the Worker's config:
+
+```jsonc
+"observability": { "enabled": true, "logs": { "enabled": true, "destinations": ["<your-destination-name>"] } }
+```
+
+Set the var `POSTHOG_LOGS` to `eu` or `us` so the privacy policy names PostHog and where it stores the logs.
+
 ## Development
 
 ```sh
