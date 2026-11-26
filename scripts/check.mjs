@@ -15,7 +15,16 @@ files.push(["ffworker.js", readFileSync("src/ffworker.js.txt", "utf8")]);
 files.push(["pages.mjs", readFileSync("src/pages.js", "utf8")]);
 files.push(["legal.mjs", readFileSync("src/legal.js", "utf8")]);
 const html = readFileSync("src/ui.html", "utf8");
-const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+// Inline <script> bodies, found by plain string scanning (ui.html only uses attribute-less tags).
+const scripts = [];
+for (let from = 0; ; ) {
+  const start = html.indexOf("<script>", from);
+  if (start < 0) break;
+  const end = html.indexOf("</script>", start + 8);
+  if (end < 0) throw new Error("unterminated <script> in ui.html");
+  scripts.push(html.slice(start + 8, end));
+  from = end + 9;
+}
 if (!scripts.length) throw new Error("no inline script found in ui.html");
 files.push(["ui.js", scripts.join("\n")]);
 for (const k of ["SITEKEY", "PRESET", "TITLE", "JSONLD", "H1", "LEAD", "EXAMPLE", "FAQ", "LINKS"])
