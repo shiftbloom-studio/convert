@@ -122,6 +122,22 @@ export const PAGES: Page[] = [
     ],
   },
   {
+    slug: "mp3-to-mp4",
+    link: "MP3 to MP4",
+    title: "Turn an MP3 and a cover image into an MP4 · convert.",
+    desc: "Put your MP3 and its cover art together in one MP4 video for YouTube and other video sites. Runs in your browser, nothing is uploaded.",
+    h1: "Turn an MP3 into an MP4 with its cover.",
+    lead: "YouTube and most social apps only take video, and your track is an MP3. Drop the song and its cover art here together and you get one MP4 that shows the cover for as long as the music plays.",
+    example: { name: "demo-v3.mp3", to: "mp4", a: "7.4 MB", b: "6.3 MB", where: "local" },
+    preset: { kind: "audio", target: "cover", mode: "local" },
+    h2: "What ends up in the video",
+    body: [
+      "The picture is your cover, shown once per second, which is all a still image needs. H.264 stores the repeats as almost nothing, so the picture adds less than 1 MB to a four-minute song. The sound is encoded again as AAC at 192 kbit/s, the format video sites expect.",
+      "Covers can be JPG, PNG or WebP, up to 20 MB. A big cover is scaled down to fit inside 1920 pixels, square art stays square, and a max width above the list shrinks it further. Drop several tracks with one image and they all get that cover. Each row also has a button to choose a different one.",
+      "ffmpeg does all of it in this tab, so the unreleased mix stays on your computer. Tracks can be up to two hours long. The first time, your browser downloads ffmpeg once, about 30 MB.",
+    ],
+  },
+  {
     slug: "jpg-to-avif",
     link: "JPG to AVIF",
     title: "Convert JPG to AVIF for free · convert.",

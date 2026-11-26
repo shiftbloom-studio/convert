@@ -6,6 +6,7 @@ const CORE = self.location.origin + "/vendor/ffmpeg-core.js";
 const WASM = CORE.replace(/\.js$/, ".wasm");
 let ff = null;
 let duration = 0;
+let tail = [];
 
 async function load() {
   if (ff) return ff;
@@ -13,7 +14,10 @@ async function load() {
   ff = await self.createFFmpegCore({ mainScriptUrlOrBlob: CORE + "#" + btoa(JSON.stringify({ wasmURL: WASM })) });
   ff.setLogger(({ message }) => {
     const m = /Duration: (\d+):(\d+):(\d+\.\d+)/.exec(message || "");
-    if (m) duration = +m[1] * 3600 + +m[2] * 60 + +m[3];
+    // The first input sets the length; a cover image reports its own, much shorter, duration after it.
+    if (m && !duration) duration = +m[1] * 3600 + +m[2] * 60 + +m[3];
+    tail.push(String(message || ""));
+    if (tail.length > 40) tail.shift();
     self.postMessage({ type: "log", message });
   });
   ff.setProgress(({ progress, time }) => {
@@ -26,24 +30,38 @@ async function load() {
 }
 
 self.onmessage = async ({ data }) => {
-  const { id, file, args, outName } = data;
+  // extra: further inputs such as a cover image, each with the input options that go before its -i.
+  const { id, file, extra = [], args, outName } = data;
+  const written = [];
   try {
     self.postMessage({ id, type: "status", status: "Loading ffmpeg, about 30 MB the first time …" });
     const core = await load();
     duration = 0;
+    tail = [];
     const inName = "in_" + (file.name || "input").replace(/[^\w.]+/g, "_");
     core.FS.writeFile(inName, new Uint8Array(await file.arrayBuffer()));
+    written.push(inName);
+    const more = [];
+    for (const [i, x] of extra.entries()) {
+      const name = "extra" + i + "_" + (x.file.name || "input").replace(/[^\w.]+/g, "_");
+      core.FS.writeFile(name, new Uint8Array(await x.file.arrayBuffer()));
+      written.push(name);
+      more.push(...(x.pre || []), "-i", name);
+    }
     self.postMessage({ id, type: "status", status: "Converting …" });
     // Drop metadata and chapters (location, device, names) from every result.
-    core.exec("-i", inName, "-map_metadata", "-1", "-map_chapters", "-1", ...args, outName);
+    core.exec("-i", inName, ...more, "-map_metadata", "-1", "-map_chapters", "-1", ...args, outName);
     const ret = core.ret;
     core.reset();
-    core.FS.unlink(inName);
+    for (const name of written.splice(0)) core.FS.unlink(name);
+    // A video without sound asked for audio, or audio without sound asked for a cover video.
+    if (ret !== 0 && tail.some((l) => /does not contain any stream|matches no streams/.test(l))) throw new Error("noaudio");
     if (ret !== 0) throw new Error("ffmpeg exit code " + ret);
     const out = core.FS.readFile(outName);
     core.FS.unlink(outName);
     self.postMessage({ id, type: "done", data: out.buffer }, [out.buffer]);
   } catch (e) {
+    for (const name of written) try { ff.FS.unlink(name); } catch {}
     self.postMessage({ id, type: "error", error: String(e && e.message ? e.message : e) });
   }
 };

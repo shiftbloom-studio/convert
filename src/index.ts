@@ -668,7 +668,7 @@ const llms = (origin: string, env: Env) => `# convert.
 
 - Images on Cloudflare: PNG, JPG, WebP, AVIF, HEIC in; PNG, JPG, WebP, AVIF out.
 - Video on Cloudflare: MP4, MOV, MKV and most other video in; MP4 (H.264), M4A audio or a still frame out.
-- In the browser: MP4, WebM, GIF, MP3, WAV, OGG, M4A and still frames out; PNG, JPG and WebP for images.
+- In the browser: MP4, WebM, GIF, MP3, WAV, OGG, M4A and still frames out; PNG, JPG and WebP for images; an MP4 from an audio file and a cover image (JPG, PNG or WebP, up to 20 MB).
 
 ## Pages
 

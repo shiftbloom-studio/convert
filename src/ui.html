@@ -144,6 +144,7 @@ input[type=number]:hover,select:hover{border-color:var(--ink45)}
 .into{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:-4px}
 .into .label{margin-right:4px}
 .into .fix{margin-left:auto}
+.into .cover{margin-left:auto}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{appearance:none;border:0;background:var(--paper);box-shadow:inset 0 0 0 1px var(--line2);color:var(--ink);font:500 14px/1 var(--sans);padding:10px 15px;border-radius:999px;cursor:pointer;transition:box-shadow .24s var(--settle),background .24s var(--settle),color .24s var(--settle)}
 .chip:hover{box-shadow:inset 0 0 0 1px var(--ink45)}
@@ -323,7 +324,7 @@ const SITEKEY = "__SITEKEY__";
 const PRESET = __PRESET__;
 const $ = (s, r = document) => r.querySelector(s);
 const MB = 1024 * 1024;
-const LIM = { image: 20 * MB, video: 200 * MB, mp4: 100 * MB, seconds: 600 };
+const LIM = { image: 20 * MB, video: 200 * MB, mp4: 100 * MB, seconds: 600, coverSeconds: 2 * 3600, coverPixels: 50e6, coverSide: 12000, coverMin: 64 };
 const fmtSize = (b) => b >= MB ? (b / MB).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
 const ext = (n) => (n.includes(".") ? n.split(".").pop() : "").toLowerCase();
 const isMp4 = (f) => f.type === "video/mp4" || /\.(mp4|m4v)$/i.test(f.name);
@@ -371,17 +372,18 @@ function scatter(el) {
 }
 
 // ---- Targets per input kind and place. The third value is the output, used to keep the
-// choice when a row switches between Cloudflare and the browser.
+// choice when a row switches between Cloudflare and the browser. A fourth value "local" marks a
+// target that always runs in the browser, because Cloudflare can't make it (MP3 for one).
 const T = {
   image: {
     cloud: [["webp", "WebP", "webp"], ["avif", "AVIF", "avif"], ["png", "PNG", "png"], ["jpeg", "JPG", "jpg"]],
     local: [["webpl", "WebP", "webp"], ["pngl", "PNG", "png"], ["jpgl", "JPG", "jpg"]],
   },
   video: {
-    cloud: [["mp4", "MP4 (H.264)", "mp4"], ["m4a", "M4A audio", "m4a"], ["jpg", "Still frame (JPG)", "stilljpg"], ["png", "Still frame (PNG)", "stillpng"]],
+    cloud: [["mp4", "MP4 (H.264)", "mp4"], ["m4a", "M4A audio", "m4a"], ["mp3", "MP3 audio", "mp3", "local"], ["jpg", "Still frame (JPG)", "stilljpg"], ["png", "Still frame (PNG)", "stillpng"]],
     local: [["mp4l", "MP4 (H.264)", "mp4"], ["webm", "WebM", "webm"], ["gif", "GIF", "gif"], ["mp3", "MP3 audio", "mp3"], ["framel", "Still frame (PNG)", "stillpng"]],
   },
-  audio: { cloud: [], local: [["mp3", "MP3", "mp3"], ["wav", "WAV", "wav"], ["ogg", "OGG", "ogg"], ["m4al", "M4A", "m4a"]] },
+  audio: { cloud: [], local: [["mp3", "MP3", "mp3"], ["wav", "WAV", "wav"], ["ogg", "OGG", "ogg"], ["m4al", "M4A", "m4a"], ["cover", "MP4 with a cover", "mp4"]] },
 };
 const scale = (o, h) => (o.width ? ["-vf", `scale='min(${o.width},iw)':${h}`] : []);
 const LOCAL = {
@@ -396,6 +398,14 @@ const LOCAL = {
   pngl: { ext: "png", type: "image/png", args: (o) => [...scale(o, -1), "-frames:v", "1"] },
   jpgl: { ext: "jpg", type: "image/jpeg", args: (o) => [...scale(o, -1), "-frames:v", "1", "-q:v", String(Math.max(2, Math.round(31 - o.quality * 0.29)))] },
   webpl: { ext: "webp", type: "image/webp", args: (o) => [...scale(o, -1), "-frames:v", "1", "-c:v", "libwebp", "-quality", String(o.quality)] },
+  // Audio plus a still image as a video, for platforms that only take video. One frame per second
+  // keeps the encode short; the picture fits inside 1920 px (or the max width) with even sides for H.264.
+  cover: { ext: "mp4", type: "video/mp4", extra: (it) => [{ file: it.cover.file, pre: ["-loop", "1", "-framerate", "1"] }],
+    // -shortest alone overshoots a looped image by a few seconds, so the track's length is set when known.
+    args: (o, it) => { const w = Math.min(o.width || 1920, 3840); return ["-map", "1:v:0", "-map", "0:a:0", ...(it.duration > 0 ? ["-t", it.duration.toFixed(3)] : []),
+      "-vf", `scale='min(${w},iw)':'min(${w},ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p`,
+      "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-crf", "20", "-r", "1", "-g", "10",
+      "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart"]; } },
 };
 
 const items = [];
@@ -410,6 +420,8 @@ const kindOf = (f) => {
   return null;
 };
 const modeOf = (it, m = it.mode || globalMode) => (T[it.kind][m].length ? m : m === "cloud" ? "local" : "cloud");
+// Where a target really runs: the row's place, unless the target only exists in the browser.
+const placeOf = (it, m = modeOf(it), t = it.sel.value) => ((T[it.kind][m].find((o) => o[0] === t) || [])[3]) || m;
 const outOf = (it, m, key) => (T[it.kind][m].find((o) => o[0] === key) || [])[2];
 function defaultTarget(it, m) {
   const list = T[it.kind][m];
@@ -427,7 +439,12 @@ function defaultTarget(it, m) {
 
 // Checks a row against the limits of the place it would be converted in.
 function check(it, m = modeOf(it), t = it.sel.value) {
+  m = placeOf(it, m, t);
   const f = it.file, mb = Math.round(f.size / MB), unreadable = ["heic", "heif", "avif"].includes(it.ext);
+  if (t === "cover") {
+    if (it.duration > LIM.coverSeconds) return { block: 1, msg: `This track is ${Math.round(it.duration / 60)} minutes long. Cover videos stop at 2 hours.` };
+    if (!it.cover) return { block: 1, msg: it.coverMsg || "Choose a cover image: JPG, PNG or WebP." };
+  }
   if (m === "cloud") {
     if (it.kind === "image" && f.size > LIM.image)
       return unreadable ? { block: 1, msg: `This image is ${fmtSize(f.size)}. Cloudflare takes up to 20 MB.` }
@@ -494,11 +511,14 @@ function syncChips(it) {
 function refresh(it) {
   if (it.state === "busy" || it.state === "done") return;
   syncChips(it);
-  const m = modeOf(it), c = check(it), tag = $(".tag", it.el);
+  const m = placeOf(it), c = check(it), tag = $(".tag", it.el);
   tag.className = "tag " + m; tag.textContent = m === "cloud" ? "cloudflare" : "browser";
   it.el.classList.toggle("blocked", !!(c && c.block));
   if (it.state === "idle") { setStatus(it, c ? c.msg : "ready"); it.el.classList.remove("err"); }
   showFix(it, c && c.fix);
+  const cb = $(".cover", it.el);
+  cb.hidden = it.sel.value !== "cover";
+  cb.textContent = it.cover ? "Change cover" : "Choose cover";
   updateBar();
 }
 function showFix(it, to) {
@@ -533,6 +553,10 @@ function readDuration(it) {
 }
 
 function addFiles(files) {
+  files = [...files];
+  const imgs = files.filter((f) => kindOf(f) === "image"), auds = files.filter((f) => kindOf(f) === "audio");
+  const pairCover = PRESET && PRESET.target === "cover" && imgs.length === 1 && auds.length > 0 ? imgs[0] : null;
+  if (pairCover) files = files.filter((f) => f !== pairCover);
   for (const f of files) {
     const kind = kindOf(f);
     const el = document.createElement("div");
@@ -540,7 +564,7 @@ function addFiles(files) {
     el.innerHTML = `<div class="thumb"></div>
       <div style="min-width:0"><div class="name"></div><div class="meta"><span class="num"></span><span class="tag"></span><span class="status" role="status"></span></div>
       <div class="track" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"></div><div class="dot"></div></div></div>
-      <div class="into"><span class="label">Turn it into</span><div class="chips" role="radiogroup"></div><button class="btn ghost small fix" hidden></button></div>
+      <div class="into"><span class="label">Turn it into</span><div class="chips" role="radiogroup"></div><button class="btn ghost small cover" type="button" hidden>Choose cover</button><input type="file" class="coverfile" hidden accept="image/png,image/jpeg,image/webp"><button class="btn ghost small fix" hidden></button></div>
       <div class="actions"><select aria-label="Target format"></select><button class="x" title="Remove" aria-label="Remove">×</button></div>`;
     $(".name", el).textContent = f.name;
     $(".num", el).textContent = fmtSize(f.size);
@@ -563,15 +587,56 @@ function addFiles(files) {
       }
     }
     it.sel.onchange = () => refresh(it);
+    if (kind === "audio") {
+      const pick = $(".coverfile", el);
+      $(".cover", el).onclick = () => pick.click();
+      pick.onchange = () => { if (pick.files[0]) setCover(it, pick.files[0], false); pick.value = ""; };
+    }
     fill(it); refresh(it);
-    if (kind === "video") readDuration(it);
+    if (kind === "video" || kind === "audio") readDuration(it);
   }
+  if (pairCover) for (const it of items.slice(-files.length)) if (it.kind === "audio") setCover(it, pairCover, true);
   updateBar(); loadQuota();
-  const added = [...files].map(kindOf);
+  const added = files.map(kindOf);
   track("files_added", { count: added.length, images: added.filter((k) => k === "image").length, videos: added.filter((k) => k === "video").length, audio: added.filter((k) => k === "audio").length, other: added.filter((k) => !k).length });
   // Bring the first new row, and with it the format picker, into view when it lands below the fold.
   const first = items[items.length - files.length];
   if (first && first.el.getBoundingClientRect().bottom > innerHeight - 40) first.el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+}
+
+// Cover images are checked before ffmpeg sees them: real PNG, JPG or WebP by their first bytes,
+// at most 20 MB and 50 megapixels, and at least 64 pixels per side.
+async function sniffCover(f) {
+  const b = new Uint8Array(await f.slice(0, 12).arrayBuffer());
+  const at = (off, str) => [...str].every((c, i) => b[off + i] === c.charCodeAt(0));
+  if (at(0, "\x89PNG\r\n\x1a\n")) return "png";
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpg";
+  if (at(0, "RIFF") && at(8, "WEBP")) return "webp";
+  return null;
+}
+function coverSize(f) {
+  return new Promise((resolve) => {
+    const url = blobUrl(f);
+    if (!url) return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight, img });
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url; img.alt = "";
+  });
+}
+async function setCover(it, f, auto) {
+  if (it.state === "busy" || it.state === "done") return;
+  const no = (msg) => { it.cover = null; it.coverMsg = msg; if (!auto) setStatus(it, msg); refresh(it); };
+  if (f.size > LIM.image) return no(`This image is ${fmtSize(f.size)}. Covers can be up to 20 MB.`);
+  if (!(await sniffCover(f))) return no("That cover isn't a JPG, PNG or WebP.");
+  const d = await coverSize(f);
+  if (!d || !(d.w > 0 && d.h > 0)) return no("This cover image is damaged or not really an image.");
+  if (d.w * d.h > LIM.coverPixels || d.w > LIM.coverSide || d.h > LIM.coverSide) return no(`This cover is ${d.w} × ${d.h} pixels. Covers can be up to 50 megapixels and 12,000 pixels per side.`);
+  if (d.w < LIM.coverMin || d.h < LIM.coverMin) return no("This cover is too small. Use one with at least 64 pixels per side.");
+  it.cover = { file: f }; it.coverMsg = "";
+  $(".thumb", it.el).replaceChildren(d.img);
+  if (it.sel.value !== "cover") pickChip(it, "cover");
+  refresh(it);
 }
 
 function updateBar() {
@@ -580,10 +645,10 @@ function updateBar() {
   const n = items.filter(canGo).length;
   const go = $("#go"); go.disabled = !n; go.textContent = n > 1 ? `Convert ${n} files` : n === 1 ? "Convert 1 file" : "Convert";
   $("#f-quality").hidden = !live.some((i) => i.kind === "image");
-  $("#f-width").hidden = !live.some((i) => i.kind !== "audio");
+  $("#f-width").hidden = !live.some((i) => i.kind !== "audio" || i.sel.value === "cover");
   $("#f-mute").hidden = !live.some((i) => i.kind === "video");
   $("#all").hidden = items.filter((i) => i.state === "done").length < 2;
-  $("#quota").hidden = !$("#quota").textContent || !live.some((i) => modeOf(i) === "cloud");
+  $("#quota").hidden = !$("#quota").textContent || !live.some((i) => placeOf(i) === "cloud");
   document.body.classList.toggle("busy", items.some((i) => i.state === "busy"));
 }
 let quotaLeft = null;
@@ -645,7 +710,8 @@ function fail(it, e, m) {
   setP(it, 1); setStatus(it, e.message || String(e), e.detail || "");
   // Offer the other place when it can take this file.
   const other = m === "cloud" ? "local" : "cloud";
-  const ok = T[it.kind][other].length && !((check(it, other, (T[it.kind][other].find((o) => o[2] === outOf(it, m, it.sel.value)) || T[it.kind][other][0])[0]) || {}).block);
+  const alt = T[it.kind][other].find((o) => o[2] === outOf(it, m, it.sel.value)) || T[it.kind][other][0];
+  const ok = alt && placeOf(it, other, alt[0]) !== placeOf(it, m) && !((check(it, other, alt[0]) || {}).block);
   showFix(it, ok && other);
   updateBar();
 }
@@ -801,10 +867,12 @@ function convertLocal(it, target) {
       else if (data.type === "done") {
         const blob = new Blob([data.data], { type: spec.type });
         finish(it, URL.createObjectURL(blob), it.file.name.replace(/\.[^.]+$/, "") + "." + spec.ext, blob.size); resolve();
-      } else if (data.type === "error") reject(E("Something went wrong. Try again in a moment.", data.error));
+      } else if (data.type === "error") reject(data.error === "noaudio"
+        ? E(target === "cover" ? "This file has no sound ffmpeg can read." : "This video has no sound to save.", data.error)
+        : E("Something went wrong. Try again in a moment.", data.error));
     };
     ffw.onerror = (e) => { ffw = null; reject(E("Your browser ran out of memory. Try a smaller file or a lower max width.", e.message)); };
-    ffw.postMessage({ id: 1, file: it.file, args: spec.args(options()), outName });
+    ffw.postMessage({ id: 1, file: it.file, extra: spec.extra ? spec.extra(it) : [], args: spec.args(options(), it), outName });
   });
   return (ffq = ffq.then(run, run)); // ffmpeg.wasm runs one job at a time
 }
@@ -812,7 +880,7 @@ function convertLocal(it, target) {
 async function convert(it) {
   if (!canGo(it)) return;
   it.state = "busy"; it.el.classList.remove("err", "blocked"); it.el.classList.add("busy"); it.sel.disabled = true; showFix(it, null); updateBar();
-  const target = it.sel.value, m = modeOf(it);
+  const target = it.sel.value, list = modeOf(it), m = placeOf(it, list, target);
   const ev = { kind: it.kind, from: /^[a-z0-9]{1,5}$/.test(it.ext) ? it.ext : "other", to: target, where: m }, t0 = Date.now();
   track("conversion_started", ev);
   try {
@@ -820,7 +888,7 @@ async function convert(it) {
     else if (it.kind === "image") await convertImage(it, target);
     else await convertVideoCloud(it, target);
     if (it.state === "done") track("conversion_completed", { ...ev, duration: secs(t0) });
-  } catch (e) { track("conversion_failed", { ...ev, duration: secs(t0), status: e.status || null }); fail(it, e, m); }
+  } catch (e) { track("conversion_failed", { ...ev, duration: secs(t0), status: e.status || null }); fail(it, e, list); }
 }
 
 $("#go").onclick = async () => {
