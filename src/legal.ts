@@ -3,15 +3,19 @@
 //
 // Privacy policy and imprint, in English and German. The operator's details come from the
 // LEGAL_* variables of the deployment (see wrangler.jsonc), never from this file, so a fork
-// shows its own operator. The text describes exactly what src/index.js, src/ui.html and the
+// shows its own operator. The text describes exactly what src/index.ts, src/ui.html and the
 // Workflow do with a visitor's data: update it whenever they change. Keep both languages in step.
 
-import { passIssuer } from "./passes.js";
+import { passIssuer } from "./passes.ts";
+import type { Env } from "./types.ts";
 
-const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
 
-const COUNTRIES = { DE: ["Germany", "Deutschland"], AT: ["Austria", "Österreich"], CH: ["Switzerland", "Schweiz"] };
-function operator(env) {
+const COUNTRIES: Record<string, [en: string, de: string]> = { DE: ["Germany", "Deutschland"], AT: ["Austria", "Österreich"], CH: ["Switzerland", "Schweiz"] };
+type Lang = "en" | "de";
+type Operator = ReturnType<typeof operator> & { passes?: string | null; logs?: LogRegion | null };
+
+function operator(env: Env) {
   const c = COUNTRIES[(env.LEGAL_COUNTRY || "").toUpperCase()] || [env.LEGAL_COUNTRY || "", env.LEGAL_COUNTRY || ""];
   return {
     ok: !!(env.LEGAL_NAME && env.LEGAL_EMAIL),
@@ -27,9 +31,9 @@ function operator(env) {
   };
 }
 
-const address = (o, lang) =>
+const address = (o: Operator, lang: Lang) =>
   `<address>${[o.name, o.business, o.street, o.city, o.country[lang]].filter(Boolean).map(esc).join("<br>")}</address>`;
-const mail = (o) => `<a href="mailto:${esc(o.email)}">${esc(o.email)}</a>`;
+const mail = (o: Operator) => `<a href="mailto:${esc(o.email)}">${esc(o.email)}</a>`;
 const missing = {
   en: "<p class=\"note\">The operator of this copy of convert hasn't filled in their details yet (the LEGAL_* variables).</p>",
   de: "<p class=\"note\">Wer diese Kopie von convert betreibt, hat die eigenen Angaben noch nicht eingetragen (die LEGAL_*-Variablen).</p>",
@@ -39,7 +43,7 @@ const CF_EN = '<a href="https://www.cloudflare.com/privacypolicy/" rel="noopener
 const CF_DE = '<a href="https://www.cloudflare.com/de-de/privacypolicy/" rel="noopener">Datenschutzerklärung von Cloudflare</a>';
 const TS = "https://www.cloudflare.com/turnstile-privacy-policy/";
 
-function imprintEn(o) {
+function imprintEn(o: Operator) {
   return `<p>Information pursuant to § 5 DDG:</p>${address(o, "en")}
 <p>Email: ${mail(o)}${o.phone ? `<br>Phone: <a href="tel:${esc(o.phone.replace(/[^\d+]/g, ""))}">${esc(o.phone)}</a>` : ""}</p>
 ${o.vat ? `<p>VAT ID pursuant to § 27a UStG: ${esc(o.vat)}</p>` : ""}
@@ -49,7 +53,7 @@ ${o.vat ? `<p>VAT ID pursuant to § 27a UStG: ${esc(o.vat)}</p>` : ""}
 <p>convert is an independent open source project. It uses Cloudflare's services but is not affiliated with or endorsed by Cloudflare. FFmpeg is a trademark of Fabrice Bellard. Names and logos belong to their respective owners.</p>`;
 }
 
-function imprintDe(o) {
+function imprintDe(o: Operator) {
   return `<p>Angaben gemäß § 5 DDG:</p>${address(o, "de")}
 <p>E-Mail: ${mail(o)}${o.phone ? `<br>Telefon: <a href="tel:${esc(o.phone.replace(/[^\d+]/g, ""))}">${esc(o.phone)}</a>` : ""}</p>
 ${o.vat ? `<p>Umsatzsteuer-Identifikationsnummer gemäß § 27a UStG: ${esc(o.vat)}</p>` : ""}
@@ -59,7 +63,7 @@ ${o.vat ? `<p>Umsatzsteuer-Identifikationsnummer gemäß § 27a UStG: ${esc(o.va
 <p>convert ist ein unabhängiges Open-Source-Projekt. Es nutzt Dienste von Cloudflare, steht aber in keiner Verbindung zu Cloudflare und wird von Cloudflare weder unterstützt noch empfohlen. FFmpeg ist eine Marke von Fabrice Bellard. Namen und Logos gehören ihren jeweiligen Inhabern.</p>`;
 }
 
-function privacyEn(o, host) {
+function privacyEn(o: Operator, host: string) {
   return `<p>convert has no accounts and sets no cookies. There is no tracking or advertising, no analysis of visitors or their behavior, and no automated decision-making about you. Nothing is kept in your browser's storage. This policy covers the personal data that is processed nonetheless when you use ${esc(host)}: your IP address, and the files you choose to convert on Cloudflare along with their names.</p>
 
 <h2>Controller</h2>
@@ -96,7 +100,7 @@ ${o.passes ? `<h2>Passes from stem</h2>
 <p><strong>You may object at any time, on grounds relating to your particular situation, to the processing of your personal data based on Art. 6(1)(f) GDPR (Art. 21 GDPR).</strong></p>`;
 }
 
-function privacyDe(o, host) {
+function privacyDe(o: Operator, host: string) {
   return `<p>convert hat keine Benutzerkonten und setzt keine Cookies. Es verwendet keine Tracking- oder Werbedienste, wertet weder Besucher noch ihr Verhalten aus und trifft keine automatisierten Entscheidungen über dich. Im Speicher deines Browsers legt convert nichts ab. Diese Erklärung beschreibt, welche personenbezogenen Daten trotzdem verarbeitet werden, wenn du ${esc(host)} nutzt: deine IP-Adresse und die Dateien, die du bei Cloudflare umwandeln lässt, samt ihren Namen.</p>
 
 <h2>Verantwortlicher</h2>
@@ -133,30 +137,33 @@ ${o.passes ? `<h2>Pässe von stem</h2>
 <p><strong>Du kannst der Verarbeitung deiner personenbezogenen Daten auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO jederzeit aus Gründen widersprechen, die sich aus deiner besonderen Situation ergeben (Art. 21 DSGVO).</strong></p>`;
 }
 
-const UPDATED = { en: "Last updated 26 November 2026", de: "Stand: 26. November 2026" };
+const UPDATED: Record<Lang, string> = { en: "Last updated 26 November 2026", de: "Stand: 26. November 2026" };
 
 // Set POSTHOG_LOGS to "eu" or "us" when the Worker's logs are exported to PostHog (see README).
-const LOG_REGION = { eu: { en: "the EU (Frankfurt)", de: "in der EU (Frankfurt)" }, us: { en: "the USA", de: "in den USA" } };
-const logRegion = (v) => LOG_REGION[String(v ?? "").trim().toLowerCase()] ?? null;
-const errorLogsEn = (where) => `<h2>Logs at PostHog</h2>
-<p>The request logs described under "Hosting" (IP address, approximate location, the address requested and details your browser sends) and the error messages our Worker writes (such as which step failed and the technical ID of the file or conversion concerned) are also sent to PostHog Inc., 2261 Market St. #4008, San Francisco, CA 94114, USA, which stores them for us on servers in ${where.en}. They contain no file contents. We use them only to fix errors and to prevent abuse, and PostHog deletes them after 14 days. The legal basis is our legitimate interest in running convert securely and reliably (Art. 6(1)(f) GDPR). PostHog processes the data as our processor under a data processing agreement (Art. 28 GDPR) that contains the EU standard contractual clauses. More in <a href="https://posthog.com/privacy" rel="noopener">PostHog's privacy policy</a>.</p>
+type LogRegion = Record<Lang, string>;
+const LOG_REGION: Record<string, LogRegion> = { eu: { en: "the EU (Frankfurt)", de: "in der EU (Frankfurt)" }, us: { en: "the USA", de: "in den USA" } };
+const logRegion = (v: unknown): LogRegion | null => LOG_REGION[String(v ?? "").trim().toLowerCase()] ?? null;
+const errorLogsEn = (where: LogRegion): string => `<h2>Logs at PostHog</h2>
+<p>A short log line for each request (IP address, approximate location, the page requested without job IDs, the chosen target format, the response status, your browser type and language), a line for each finished conversion (engine, target format and duration) and the error messages our Worker writes (such as which step failed and the technical ID of the conversion concerned) are sent to PostHog Inc., 2261 Market St. #4008, San Francisco, CA 94114, USA, which stores them for us on servers in ${where.en}. They contain no file contents or file names. We use them only to fix errors and to prevent abuse, and PostHog deletes them after 14 days. The legal basis is our legitimate interest in running convert securely and reliably (Art. 6(1)(f) GDPR). PostHog processes the data as our processor under a data processing agreement (Art. 28 GDPR) that contains the EU standard contractual clauses. More in <a href="https://posthog.com/privacy" rel="noopener">PostHog's privacy policy</a>.</p>
 `;
-const errorLogsDe = (where) => `<h2>Protokolle bei PostHog</h2>
-<p>Die unter „Hosting“ beschriebenen Anfrageprotokolle (IP-Adresse, ungefährer Standort, aufgerufene Adresse und Angaben, die dein Browser mitsendet) und die Fehlermeldungen, die unser Worker schreibt (etwa welcher Schritt fehlgeschlagen ist und die technische ID der betroffenen Datei oder Umwandlung), werden außerdem an PostHog Inc., 2261 Market St. #4008, San Francisco, CA 94114, USA, gesendet, die sie für uns auf Servern ${where.de} speichert. Sie enthalten keine Dateiinhalte. Wir nutzen sie nur, um Fehler zu beheben und Missbrauch zu verhindern, und PostHog löscht sie nach 14 Tagen. Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren und zuverlässigen Betrieb von convert (Art. 6 Abs. 1 lit. f DSGVO). PostHog verarbeitet die Daten als unser Auftragsverarbeiter auf Grundlage eines Auftragsverarbeitungsvertrags (Art. 28 DSGVO), der die EU-Standardvertragsklauseln enthält. Mehr dazu in der <a href="https://posthog.com/privacy" rel="noopener">Datenschutzerklärung von PostHog</a>.</p>
+const errorLogsDe = (where: LogRegion): string => `<h2>Protokolle bei PostHog</h2>
+<p>Eine kurze Protokollzeile je Anfrage (IP-Adresse, ungefährer Standort, die aufgerufene Seite ohne Job-IDs, das gewählte Zielformat, der Antwortstatus, Browsertyp und Sprache), eine Zeile je fertiger Umwandlung (Verfahren, Zielformat und Dauer) und die Fehlermeldungen, die unser Worker schreibt (etwa welcher Schritt fehlgeschlagen ist und die technische ID der betroffenen Umwandlung), werden an PostHog Inc., 2261 Market St. #4008, San Francisco, CA 94114, USA, gesendet, die sie für uns auf Servern ${where.de} speichert. Sie enthalten keine Dateiinhalte und keine Dateinamen. Wir nutzen sie nur, um Fehler zu beheben und Missbrauch zu verhindern, und PostHog löscht sie nach 14 Tagen. Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren und zuverlässigen Betrieb von convert (Art. 6 Abs. 1 lit. f DSGVO). PostHog verarbeitet die Daten als unser Auftragsverarbeiter auf Grundlage eines Auftragsverarbeitungsvertrags (Art. 28 DSGVO), der die EU-Standardvertragsklauseln enthält. Mehr dazu in der <a href="https://posthog.com/privacy" rel="noopener">Datenschutzerklärung von PostHog</a>.</p>
 `;
 
 
-export const LEGAL = {
+type LegalPage = { lang: Lang; title: string; other: string; otherLabel: string; body: (o: Operator, host: string) => string; updated?: boolean };
+
+export const LEGAL: Record<string, LegalPage> = {
   privacy: { lang: "en", title: "Privacy policy", other: "datenschutz", otherLabel: "Deutsch", body: privacyEn, updated: true },
   datenschutz: { lang: "de", title: "Datenschutzerklärung", other: "privacy", otherLabel: "English", body: privacyDe, updated: true },
   imprint: { lang: "en", title: "Imprint", other: "impressum", otherLabel: "Deutsch", body: imprintEn },
   impressum: { lang: "de", title: "Impressum", other: "imprint", otherLabel: "English", body: imprintDe },
 };
 
-export function legalPage(slug, env, origin) {
+export function legalPage(slug: string, env: Env, origin: string) {
   const p = LEGAL[slug];
-  const o = operator(env);
-  o.passes = passIssuer(env) ? new URL(passIssuer(env)).host : null;
+  const o: Operator = operator(env);
+  o.passes = passIssuer(env) ? new URL(passIssuer(env)!).host : null;
   o.logs = logRegion(env.POSTHOG_LOGS);
   const host = new URL(origin).host;
   const back = p.lang === "de" ? "Zurück zu convert" : "Back to convert";

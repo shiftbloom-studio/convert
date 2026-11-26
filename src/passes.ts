@@ -10,24 +10,26 @@
 // Off unless PASS_ISSUER is set (e.g. https://stem.example.com). Workers on the same Cloudflare account
 // as stem should also bind it as STEM, so the key directory is fetched without the public hostname.
 
+import type { Env } from "./types.ts";
+
 const DIRECTORY = "/.well-known/private-token-issuer-directory";
 const TOKEN_TYPE = 2;
 const TOKEN_BYTES = 2 + 32 + 32 + 32 + 256;
-const enc = (s) => new TextEncoder().encode(s);
+const enc = (s: string) => new TextEncoder().encode(s);
 
-export const b64u = (b) => {
+export const b64u = (b: Uint8Array) => {
   let s = "";
   for (const x of b) s += String.fromCharCode(x);
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
-export const unb64u = (s) => {
+export const unb64u = (s: unknown) => {
   if (typeof s !== "string" || !/^[A-Za-z0-9_-]*$/.test(s)) throw new Error("not base64url");
   return Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 };
-const sha256 = async (b) => new Uint8Array(await crypto.subtle.digest("SHA-256", b));
-const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+const sha256 = async (b: BufferSource) => new Uint8Array(await crypto.subtle.digest("SHA-256", b));
+const same = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-export function passIssuer(env) {
+export function passIssuer(env: Pick<Env, "PASS_ISSUER">) {
   try {
     const u = new URL(env.PASS_ISSUER || "");
     return u.protocol === "https:" || u.hostname === "localhost" ? u.origin : null;
@@ -37,7 +39,7 @@ export function passIssuer(env) {
 }
 
 /** TokenChallenge (RFC 9577, section 2.1): this site, this issuer, no redemption context, so passes can be fetched ahead. */
-export function challenge(issuerHost, originHost) {
+export function challenge(issuerHost: string, originHost: string) {
   const iss = enc(issuerHost), org = enc(originHost);
   const out = new Uint8Array(2 + 2 + iss.length + 1 + 2 + org.length);
   const v = new DataView(out.buffer);
@@ -50,8 +52,8 @@ export function challenge(issuerHost, originHost) {
 }
 
 /** Modulus and exponent of an RSA SubjectPublicKeyInfo, as a JWK WebCrypto can import. */
-export function tokenKeyJwk(spki) {
-  const read = (at) => {
+export function tokenKeyJwk(spki: Uint8Array): JsonWebKey {
+  const read = (at: number) => {
     let len = spki[at + 1], start = at + 2;
     if (len & 0x80) {
       const n = len & 0x7f;
@@ -75,31 +77,44 @@ export function tokenKeyJwk(spki) {
 
 // ---------------------------------------------------------------- the issuer's keys
 
-const cache = { at: 0, refreshAt: 0, keys: null };
+type IssuerKeys = {
+  keys: Map<string, { key: CryptoKey; notAfter: number }>;
+  raw: { id: string; tokenKey: string }[];
+  requestUri: string | undefined;
+  perDay: number | null;
+};
+/** The issuer directory as stem serves it (RFC 9578, section 4, plus stem's own fields). */
+type Directory = {
+  "issuer-request-uri"?: string;
+  "token-keys"?: { "token-type": number; "token-key": string; "stem-not-after"?: number }[];
+  "stem-per-day"?: number;
+};
+
+const cache: { at: number; refreshAt: number; keys: IssuerKeys | null } = { at: 0, refreshAt: 0, keys: null };
 /** Forgets the cached keys (tests switch issuers). */
 export const resetPassKeys = () => Object.assign(cache, { at: 0, refreshAt: 0, keys: null });
 const TTL = 5 * 60 * 1000;
 
-async function fetchDirectory(env) {
+async function fetchDirectory(env: Env): Promise<IssuerKeys> {
   const url = passIssuer(env) + DIRECTORY;
   const r = env.STEM ? await env.STEM.fetch(new Request(url)) : await fetch(url, { cf: { cacheTtl: 60 } });
   if (!r.ok) throw new Error("issuer directory: HTTP " + r.status);
-  const d = await r.json();
-  const keys = new Map();
-  const raw = [];
+  const d = await r.json<Directory>();
+  const keys: IssuerKeys["keys"] = new Map();
+  const raw: IssuerKeys["raw"] = [];
   for (const k of d["token-keys"] || []) {
     if (k["token-type"] !== TOKEN_TYPE) continue;
     const spki = unb64u(k["token-key"]);
     const id = b64u(await sha256(spki));
     const key = await crypto.subtle.importKey("jwk", tokenKeyJwk(spki), { name: "RSA-PSS", hash: "SHA-384" }, false, ["verify"]);
-    keys.set(id, { key, notAfter: +k["stem-not-after"] || 0 });
+    keys.set(id, { key, notAfter: +k["stem-not-after"]! || 0 });
     raw.push({ id, tokenKey: k["token-key"] });
   }
   return { keys, raw, requestUri: d["issuer-request-uri"], perDay: d["stem-per-day"] || null };
 }
 
 /** The issuer's current keys, newest first. `fresh` refetches, at most once a minute. */
-export async function issuerKeys(env, fresh = false) {
+export async function issuerKeys(env: Env, fresh = false): Promise<IssuerKeys> {
   const t = Date.now();
   if (cache.keys && t - cache.at < TTL && !(fresh && t > cache.refreshAt)) return cache.keys;
   const p = fetchDirectory(env).then((d) => { cache.at = Date.now(); cache.keys = d; return d; });
@@ -113,7 +128,7 @@ export async function issuerKeys(env, fresh = false) {
 }
 
 /** What the page needs to fetch passes: where to ask, the key and the challenge to bind them to. */
-export async function passConfig(env, url) {
+export async function passConfig(env: Env, url: URL) {
   const issuer = passIssuer(env);
   if (!issuer) return null;
   const d = await issuerKeys(env);
@@ -137,7 +152,7 @@ export async function passConfig(env, url) {
  * The pass in `Authorization: PrivateToken token="..."` (RFC 9577, section 2.2). null when the request
  * has no PrivateToken header (other schemes, e.g. from a proxy, are left alone), "" when it's malformed.
  */
-export function readPass(req) {
+export function readPass(req: Request) {
   const h = req.headers.get("authorization") || "";
   if (!/^PrivateToken(\s|$)/i.test(h)) return null;
   const m = /^PrivateToken\s+token="?([A-Za-z0-9_-]{1,600})"?\s*$/i.exec(h);
@@ -148,12 +163,14 @@ export function readPass(req) {
  * Checks a pass for this site: format, binding to our challenge, a key the issuer lists and its signature.
  * Returns { ok, keyId, nonce } or { ok: false, reason }. Doesn't spend it.
  */
-export async function checkPass(env, url, token) {
-  let b;
+export type PassCheck = { ok: true; keyId: string; nonce: string } | { ok: false; reason: string };
+
+export async function checkPass(env: Env, url: URL, token: string): Promise<PassCheck> {
+  let b: Uint8Array;
   try { b = unb64u(token); } catch { return { ok: false, reason: "malformed" }; }
   if (b.length !== TOKEN_BYTES || ((b[0] << 8) | b[1]) !== TOKEN_TYPE) return { ok: false, reason: "malformed" };
   const issuer = passIssuer(env);
-  if (!same(b.subarray(34, 66), await sha256(challenge(new URL(issuer).host, url.hostname)))) return { ok: false, reason: "other-site" };
+  if (!same(b.subarray(34, 66), await sha256(challenge(new URL(issuer!).host, url.hostname)))) return { ok: false, reason: "other-site" };
   const keyId = b64u(b.subarray(66, 98));
   let k = (await issuerKeys(env)).keys.get(keyId);
   if (!k) k = (await issuerKeys(env, true)).keys.get(keyId);
@@ -167,12 +184,12 @@ export async function checkPass(env, url, token) {
  * changes for any request). Otherwise { ok, keyId, nonce } or { ok: false, reason }.
  * A pass counts once, across all of convert: one Durable Object per issuer key holds the spent nonces.
  */
-export async function spendPass(req, env, url) {
+export async function spendPass(req: Request, env: Env, url: URL): Promise<PassCheck | null> {
   if (!passIssuer(env) || !env.SPENT) return null;
   const token = readPass(req);
   if (token === null) return null;
   if (!token) return { ok: false, reason: "malformed" };
-  let c;
+  let c: PassCheck;
   try {
     c = await checkPass(env, url, token);
   } catch (e) {
@@ -185,7 +202,7 @@ export async function spendPass(req, env, url) {
 }
 
 /** Gives back a pass that was spent on a request convert then refused anyway (the global cap). */
-export async function unspendPass(env, pass) {
+export async function unspendPass(env: Env, pass: { keyId: string; nonce: string }) {
   try {
     await env.SPENT.get(env.SPENT.idFromName(pass.keyId)).fetch("https://spent/" + pass.nonce, { method: "DELETE" });
   } catch (e) {
@@ -198,11 +215,12 @@ export async function unspendPass(env, pass) {
  * so three days after the first pass the whole list goes.
  */
 export class SpentPasses {
-  constructor(state) {
+  declare state: DurableObjectState;
+  constructor(state: DurableObjectState) {
     this.state = state;
     state.storage.sql.exec("CREATE TABLE IF NOT EXISTS spent (nonce TEXT PRIMARY KEY, at INTEGER NOT NULL)");
   }
-  async fetch(req) {
+  async fetch(req: Request) {
     const nonce = new URL(req.url).pathname.slice(1);
     if (!/^[A-Za-z0-9_-]{43}$/.test(nonce)) return new Response(null, { status: 400 });
     if (req.method === "DELETE") {

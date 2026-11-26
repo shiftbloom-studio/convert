@@ -4,7 +4,8 @@
   "description": "Image, video and audio converter on Cloudflare Workers, Images, Stream, Media Transformations and Workflows, with local ffmpeg.wasm fallback.",
   "scripts": {
     "dev": "wrangler dev --remote",
-    "check": "node scripts/check.mjs && node --test test/*.test.mjs",
+    "typecheck": "tsc -p . && tsc -p tsconfig.node.json",
+    "check": "npm run typecheck && node scripts/check.ts && node --test test/*.test.ts",
     "build": "wrangler deploy --dry-run --outdir dist",
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute convert-db --remote --file schema.sql"
@@ -20,6 +21,9 @@
   "homepage": "https://convert.shiftbloom.studio",
   "devDependencies": {
     "@cloudflare/privacypass-ts": "0.9.0",
+    "@cloudflare/workers-types": "^5.20261125.1",
+    "@types/node": "^26.6.11",
+    "typescript": "^7.0.2",
     "wrangler": "^4.168.0"
   },
   "private": true,

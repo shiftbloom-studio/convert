@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { publicVerif, Token, TOKEN_TYPES } from "@cloudflare/privacypass-ts";
-import { challenge, checkPass, spendPass, unspendPass, passConfig, SpentPasses, b64u, unb64u, tokenKeyJwk, resetPassKeys } from "../src/passes.js";
+import { challenge, checkPass, spendPass, unspendPass, passConfig, SpentPasses, b64u, unb64u, tokenKeyJwk, resetPassKeys } from "../src/passes.ts";
 await import("../src/passes.client.js");
 const P = globalThis.convertPasses;
 

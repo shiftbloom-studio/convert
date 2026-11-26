@@ -24,9 +24,9 @@ Before converting, people choose where it happens. "On Cloudflare" is faster and
 ## How it works
 
 ```
-browser ──▶ Worker (src/index.js)
-             ├─ GET  /, /heic-to-jpg, …      pages (src/ui.html + src/pages.js), fonts proxied via /fonts.css
-             ├─ GET  /privacy, /imprint, …    legal pages (src/legal.js), operator from LEGAL_* vars
+browser ──▶ Worker (src/index.ts)
+             ├─ GET  /, /heic-to-jpg, …      pages (src/ui.html + src/pages.ts), fonts proxied via /fonts.css
+             ├─ GET  /privacy, /imprint, …    legal pages (src/legal.ts), operator from LEGAL_* vars
              ├─ POST /api/session ─────────▶ Turnstile ─▶ 20 minute key for images
              ├─ POST /api/image ───────────▶ checks ─▶ Images binding ─▶ response (nothing stored)
              ├─ POST /api/jobs ────────────▶ Turnstile + rate limit + daily quotas, then:
@@ -63,17 +63,17 @@ The per-IP and global daily quotas live in `wrangler.jsonc` under `vars` and kee
 
 ### Passes
 
-The per-connection allowance punishes everyone behind a shared connection. People signed in at a [stem](https://github.com/shiftbloom-studio/stem) issuer can get passes: anonymous [Privacy Pass](https://www.rfc-editor.org/rfc/rfc9578) tokens, 50 a day, one per conversion once the connection's free ones are used up. The browser blinds each pass before stem signs it (`src/passes.client.js`, no dependencies), so neither stem nor convert can tell later whose pass it was. The Worker checks stem's signature with the key from stem's issuer directory and a Durable Object per key remembers spent passes (`src/passes.js`). The global daily caps still apply.
+The per-connection allowance punishes everyone behind a shared connection. People signed in at a [stem](https://github.com/shiftbloom-studio/stem) issuer can get passes: anonymous [Privacy Pass](https://www.rfc-editor.org/rfc/rfc9578) tokens, 50 a day, one per conversion once the connection's free ones are used up. The browser blinds each pass before stem signs it (`src/passes.client.js`, no dependencies), so neither stem nor convert can tell later whose pass it was. The Worker checks stem's signature with the key from stem's issuer directory and a Durable Object per key remembers spent passes (`src/passes.ts`). The global daily caps still apply.
 
 Set `PASS_ISSUER` to stem's origin and add convert's origin to that stem's `PASS_ORIGINS`. On the same Cloudflare account, also bind stem as `STEM` (see `wrangler.jsonc`) so the Worker doesn't fetch keys over the public hostname. Without `PASS_ISSUER` nothing changes.
 
 ### SEO and pages
 
-`src/pages.js` holds the copy for the start page and eight format pages such as `/heic-to-jpg`. Each page loads the same converter with a preset target and adds its own article, canonical URL, Open Graph tags and JSON-LD. The Worker also serves `/sitemap.xml`, `/robots.txt`, `/llms.txt`, `/og.png` and an HTML 404 page. All URLs are built from the request's origin, so they follow your own domain.
+`src/pages.ts` holds the copy for the start page and eight format pages such as `/heic-to-jpg`. Each page loads the same converter with a preset target and adds its own article, canonical URL, Open Graph tags and JSON-LD. The Worker also serves `/sitemap.xml`, `/robots.txt`, `/llms.txt`, `/og.png` and an HTML 404 page. All URLs are built from the request's origin, so they follow your own domain.
 
 ## Tech stack
 
-- Plain JavaScript modules bundled by Wrangler, with the UI in one HTML file. ffmpeg.wasm runs in a web worker in the browser.
+- TypeScript Worker modules bundled by Wrangler (types only, checked with `tsc`), with the UI in one HTML file. ffmpeg.wasm runs in a web worker in the browser.
 - Cloudflare Workers with Workflows, R2, D1, Images, Media Transformations, Stream, Turnstile, rate limiting and a Cron Trigger
 - Node.js 26 for builds and checks
 
@@ -100,7 +100,7 @@ npx wrangler secret put TURNSTILE_SECRET
 npm run deploy
 ```
 
-To use your own domain, uncomment `routes` in `wrangler.jsonc`. Rate-limit `namespace_id`s must be unique per account, so change them if they collide with another Worker. Point `REPO` in `src/pages.js` and the GitHub links in `src/ui.html` at your fork.
+To use your own domain, uncomment `routes` in `wrangler.jsonc`. Rate-limit `namespace_id`s must be unique per account, so change them if they collide with another Worker. Point `REPO` in `src/pages.ts` and the GitHub links in `src/ui.html` at your fork.
 
 ### Deploy with Workers Builds
 
@@ -111,8 +111,10 @@ convert.shiftbloom.studio deploys with Workers Builds on every push to `main`, a
 Workers Logs can be exported over OpenTelemetry without code changes. Create a logs destination under Workers & Pages > Observability > Destinations with the URL `https://eu.i.posthog.com/i/v1/logs` (or `us.i.posthog.com`) and the header `Authorization: Bearer <your PostHog project token>`, then add it to the Worker's config:
 
 ```jsonc
-"observability": { "enabled": true, "logs": { "enabled": true, "destinations": ["<your-destination-name>"] } }
+"observability": { "enabled": true, "redact_query_string": true, "logs": { "enabled": true, "invocation_logs": false, "destinations": ["<your-destination-name>"] } }
 ```
+
+Keep `invocation_logs` off: Cloudflare's invocation logs contain the full request URL, and a job's URL is the link to its result. With `POSTHOG_LOGS` set, convert writes its own line per request instead (method, path with job IDs masked, target format, quality and width, status, duration, IP, country, user agent, language, content type and length) and one line per finished conversion (engine, target format, duration).
 
 Set the var `POSTHOG_LOGS` to `eu` or `us` so the privacy policy names PostHog and where it stores the logs.
 
@@ -121,7 +123,7 @@ Set the var `POSTHOG_LOGS` to `eu` or `us` so the privacy policy names PostHog a
 ```sh
 cp .dev.vars.example .dev.vars   # Turnstile test secret
 npm run dev                      # wrangler dev --remote (Images, Media and Stream need remote bindings)
-npm run check                    # syntax check and tests
+npm run check                    # type check, syntax check of the browser scripts, tests
 npm run build                    # wrangler dry run into dist/
 ```
 
@@ -133,7 +135,7 @@ Uploaded videos and results stay in R2 for at most 24 hours. Images are converte
 
 IP addresses are only used as a keyed hash that changes every day, for rate limits and quotas. Fonts and the ffmpeg core are served by the Worker, so visitors never connect to Google Fonts, Fontshare or jsDelivr. Turnstile loads only when something is converted on Cloudflare.
 
-The privacy policy and imprint live in `src/legal.js`, in English and German, at `/privacy`, `/datenschutz`, `/imprint` and `/impressum`. The operator's name, address and contact come from the `LEGAL_*` variables in `wrangler.jsonc`, so set them for your own deployment and check that the text still matches what your copy does.
+The privacy policy and imprint live in `src/legal.ts`, in English and German, at `/privacy`, `/datenschutz`, `/imprint` and `/impressum`. The operator's name, address and contact come from the `LEGAL_*` variables in `wrangler.jsonc`, so set them for your own deployment and check that the text still matches what your copy does.
 
 ## Contributing
 
