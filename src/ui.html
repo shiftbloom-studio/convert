@@ -217,6 +217,7 @@ footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
+__POSTHOG__
 </head>
 <body>
 <header class="top">
@@ -327,6 +328,9 @@ const fmtSize = (b) => b >= MB ? (b / MB).toFixed(1) + " MB" : Math.max(1, Math.
 const ext = (n) => (n.includes(".") ? n.split(".").pop() : "").toLowerCase();
 const isMp4 = (f) => f.type === "video/mp4" || /\.(mp4|m4v)$/i.test(f.name);
 const E = (msg, detail) => Object.assign(new Error(msg), { detail });
+// Usage statistics (only when PostHog is on): kinds, extensions, formats and timings, never names, sizes or messages.
+const track = (e, p) => window.sbTrack && window.sbTrack(e, p);
+const secs = (t) => { const s = (Date.now() - t) / 1000; return s < 2 ? "<2s" : s < 10 ? "<10s" : s < 60 ? "<1m" : s < 300 ? "<5m" : ">=5m"; };
 
 // ---- The Bloom: the exact mark from shiftbloom.studio (four petal rings + seed, 10·10·8·6),
 // gradient from 32px up, solid Bloom Red below. Plus the sprinkles, from the brand spec.
@@ -563,6 +567,8 @@ function addFiles(files) {
     if (kind === "video") readDuration(it);
   }
   updateBar(); loadQuota();
+  const added = [...files].map(kindOf);
+  track("files_added", { count: added.length, images: added.filter((k) => k === "image").length, videos: added.filter((k) => k === "video").length, audio: added.filter((k) => k === "audio").length, other: added.filter((k) => !k).length });
   // Bring the first new row, and with it the format picker, into view when it lands below the fold.
   const first = items[items.length - files.length];
   if (first && first.el.getBoundingClientRect().bottom > innerHeight - 40) first.el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
@@ -807,11 +813,14 @@ async function convert(it) {
   if (!canGo(it)) return;
   it.state = "busy"; it.el.classList.remove("err", "blocked"); it.el.classList.add("busy"); it.sel.disabled = true; showFix(it, null); updateBar();
   const target = it.sel.value, m = modeOf(it);
+  const ev = { kind: it.kind, from: /^[a-z0-9]{1,5}$/.test(it.ext) ? it.ext : "other", to: target, where: m }, t0 = Date.now();
+  track("conversion_started", ev);
   try {
     if (m === "local") await convertLocal(it, target);
     else if (it.kind === "image") await convertImage(it, target);
     else await convertVideoCloud(it, target);
-  } catch (e) { fail(it, e, m); }
+    if (it.state === "done") track("conversion_completed", { ...ev, duration: secs(t0) });
+  } catch (e) { track("conversion_failed", { ...ev, duration: secs(t0), status: e.status || null }); fail(it, e, m); }
 }
 
 $("#go").onclick = async () => {

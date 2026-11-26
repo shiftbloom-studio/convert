@@ -118,6 +118,12 @@ Keep `invocation_logs` off: Cloudflare's invocation logs contain the full reques
 
 Set the var `POSTHOG_LOGS` to `eu` or `us` so the privacy policy names PostHog and where it stores the logs.
 
+### Usage statistics with PostHog (optional)
+
+With the secret `POSTHOG_KEY` (a PostHog project token, `npx wrangler secret put POSTHOG_KEY`; region via the var `POSTHOG_HOST`, default `https://us.i.posthog.com`), the converter pages and the legal pages load `/_sb/init.js`. It loads posthog-js through `/_sb/*` on convert's own origin, so the CSP needs no new hosts. posthog-js runs cookieless, without session replay; autocapture only records clicks on buttons and links with text masked; job URLs and every path that isn't a converter or legal page are reported as `/[private]`. Turn on cookieless tracking in the PostHog project settings.
+
+The page sends `files_added` (counts by kind), `conversion_started`, `conversion_completed` and `conversion_failed` (kind, extension, target, cloud or browser, duration class). The Worker sends `image_converted`, `video_job_created`, `video_job_done`, `video_job_failed` and `$exception`, without IP or person profile. File names, sizes, contents and passes are never sent. The privacy policy gains a "Usage statistics" section (EN and DE).
+
 ## Development
 
 ```sh
