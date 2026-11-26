@@ -106,6 +106,18 @@ To use your own domain, uncomment `routes` in `wrangler.jsonc`. Rate-limit `name
 
 convert.shiftbloom.studio deploys with Workers Builds on every push to `main`, and no API token is stored on GitHub. Connect the repository to the Worker in the Cloudflare dashboard (Settings > Build). Keep the D1 database id out of the repository: let the build command fill it into a deploy config from a build variable, and deploy that config with `npx wrangler deploy --keep-vars`, so the vars you set in the dashboard stay. The build picks up Node 26 from `.node-version`.
 
+### Logs in PostHog
+
+Workers Logs can be exported over OpenTelemetry without code changes. Create a logs destination under Workers & Pages > Observability > Destinations with the URL `https://eu.i.posthog.com/i/v1/logs` (or `us.i.posthog.com`) and the header `Authorization: Bearer <your PostHog project token>`, then add it to the Worker's config:
+
+```jsonc
+"observability": { "enabled": true, "redact_query_string": true, "logs": { "enabled": true, "invocation_logs": false, "destinations": ["<your-destination-name>"] } }
+```
+
+Keep `invocation_logs` off: Cloudflare's invocation logs contain the full request URL, and a job's URL is the link to its result. With `POSTHOG_LOGS` set, convert writes its own line per request instead (method, path with job IDs masked, target format, quality and width, status, duration, IP, country, user agent, language, content type and length) and one line per finished conversion (engine, target format, duration).
+
+Set the var `POSTHOG_LOGS` to `eu` or `us` so the privacy policy names PostHog and where it stores the logs.
+
 ## Development
 
 ```sh

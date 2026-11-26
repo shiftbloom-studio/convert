@@ -28,6 +28,8 @@ export interface Env {
   LEGAL_CITY: string;
   LEGAL_COUNTRY: string;
   LEGAL_EMAIL: string;
+  /** "eu" or "us" when the Worker's logs are exported to PostHog (see README). */
+  POSTHOG_LOGS?: string;
   LEGAL_PHONE: string;
   LEGAL_VAT_ID: string;
   LEGAL_AUTHORITY: string;

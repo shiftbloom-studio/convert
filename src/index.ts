@@ -7,6 +7,7 @@ import FFWORKER from "./ffworker.js.txt";
 import OG from "./og.png";
 import { HOME, FAQ, PAGES, REPO } from "./pages.ts";
 import { LEGAL, legalPage } from "./legal.ts";
+import { requestLine } from "./accesslog.ts";
 import PASSES_JS from "./passes.client.js";
 import { spendPass, unspendPass, passConfig, passIssuer, SpentPasses } from "./passes.ts";
 import type { Env, Home, Job, Page } from "./types.ts";
@@ -285,6 +286,7 @@ export class ConvertJob extends WorkflowEntrypoint<Env, { id: string }> {
 
       await step.do("done", async () => {
         await env.FILES.delete(`in/${id}`);
+        if (env.POSTHOG_LOGS) console.log({ message: "convert-job done", engine: job.engine, target: opts.target, seconds: Math.round((Date.now() - job.created_at) / 1000) });
         await updateJob(env, id, {
           status: "done", progress: 100, step: "Done",
           output_key: `out/${id}`, output_name: outName, output_type: target.type,
@@ -753,12 +755,16 @@ async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Res
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
+    const started = Date.now();
+    let res: Response;
     try {
-      return await route(req, env, ctx);
+      res = await route(req, env, ctx);
     } catch (e) {
       console.error(e);
-      return err("Something went wrong. Try again in a moment.", 500);
+      res = err("Something went wrong. Try again in a moment.", 500);
     }
+    if (env.POSTHOG_LOGS) console.log(requestLine(req, res.status, Date.now() - started));
+    return res;
   },
   // Safety net: remove leftover uploads, Stream copies, results and old rows.
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
