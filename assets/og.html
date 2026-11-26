@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- Source of src/og.png (1200x630). Render it at 1200x630 with fonts from /fonts.css. -->
+<html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://convert.shiftbloom.studio/fonts.css">
+<style>
+html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#fff}
+body{position:relative;font-family:"General Sans",sans-serif;color:#1A1216}
+.brand{position:absolute;left:80px;top:72px;display:flex;align-items:center;gap:14px;font:600 40px/1 "Clash Display",sans-serif;letter-spacing:-.02em}
+.brand svg{width:46px;height:46px}
+.seed{color:#FF2E52}
+h1{position:absolute;left:80px;top:190px;margin:0;font:600 92px/1.02 "Clash Display",sans-serif;letter-spacing:-.035em;width:720px}
+h1 .a{color:#FF2E52}
+.row{position:absolute;left:80px;bottom:78px;display:flex;align-items:center;gap:22px;font:500 26px/1 "JetBrains Mono",monospace;color:rgba(26,18,22,.62)}
+.row b{font-weight:500;color:#1A1216}
+.big{position:absolute;right:-150px;top:50%;width:560px;height:560px;transform:translateY(-50%)}
+.s{position:absolute}
+</style></head><body>
+<div class="brand"><svg id="m" viewBox="-105 -105 210 210"></svg><span>convert<span class="seed">.</span></span></div>
+<h1>HEIC <span class="a">→</span> JPG<br>MOV <span class="a">→</span> MP4</h1>
+<div class="row"><b>IMG_2041.HEIC</b><span>3.1 MB → 840 KB</span></div>
+<svg class="big" id="b" viewBox="-105 -105 210 210"></svg>
+<svg class="s" style="left:760px;top:96px" width="34" height="34" viewBox="-10 -10 20 20"><path d="M0-10C1-2 2-1 10 0 2 1 1 2 0 10-1 2-2 1-10 0-2-1-1-2 0-10Z" fill="#FF2E52"/></svg>
+<svg class="s" style="left:700px;top:500px" width="16" height="16" viewBox="-5 -5 10 10"><path d="M-1.4-5h2.8v3.6H5v2.8H1.4V5h-2.8V1.4H-5v-2.8h3.6z" fill="#1A1216"/></svg>
+<svg class="s" style="left:1110px;top:560px" width="12" height="12" viewBox="-5 -5 10 10"><circle r="5" fill="#FF2E52"/></svg>
+<script>
+const petal=(r,w)=>{const a=w*r,b=w*r*.55,y1=-r*.32,y2=-r*.78;return `M0 0C${a} ${y1} ${b} ${y2} 0 ${-r}C${-b} ${y2} ${-a} ${y1} 0 0Z`};
+const rings=[[100,10,.27,"#D8163F","#FF2E52",0],[74,10,.29,"#FF2E52","#FF7E9E",18],[50,8,.33,"#FF7E9E","#FFC2D3",22.5],[27,6,.4,"#FFB4CA","#FFDCE7",0]];
+function draw(id,solid){let d="",g="";rings.forEach(([r,n,w,a,b,rot],i)=>{if(solid&&i>1)return;const f=solid?"#FF2E52":`url(#${id}${i})`;if(!solid)d+=`<linearGradient id="${id}${i}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`;for(let k=0;k<n;k++)g+=`<path d="${petal(r,w)}" transform="rotate(${rot+360/n*k})" fill="${f}"/>`});g+=`<circle r="7" fill="${solid?"#C81040":"#FF2E52"}"/>`;document.getElementById(id).innerHTML=`<defs>${d}</defs>${g}`}
+draw("m",true);draw("b",false);
+</script>
+</body></html>

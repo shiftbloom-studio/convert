@@ -1,19 +1,34 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later · Copyright (C) 2026 shiftbloom studio and contributors -->
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>convert. · shiftbloom studio.</title>
-<meta name="description" content="Bilder, Videos und Audio umwandeln: PNG, JPG, WebP, AVIF, MP4, WebM, GIF, MP3. Auf Cloudflare oder komplett lokal im Browser. Offen, kostenlos, von shiftbloom studio.">
-<meta name="theme-color" content="#FFFFFF">
+<title>__TITLE__</title>
+<meta name="description" content="__DESC__">
+<link rel="canonical" href="__CANONICAL__">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="convert.">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="__CANONICAL__">
+<meta property="og:title" content="__TITLE__">
+<meta property="og:description" content="__DESC__">
+<meta property="og:image" content="__OGIMG__">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The convert. wordmark next to a file row that turns screenshot.png into WebP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="__TITLE__">
+<meta name="twitter:description" content="__DESC__">
+<meta name="twitter:image" content="__OGIMG__">
+<meta name="theme-color" content="#F6F1EE">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/fonts.css">
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<script type="application/ld+json">__JSONLD__</script>
 <style>
 :root{
-  --bloom:#FF2E52;--root:#C81040;--petal:#FF8FAB;--blush:#FFE9EF;--ink:#1A1216;--paper:#FFFFFF;--warm:#FAF6F4;
-  --ink60:rgba(26,18,22,.6);--ink45:rgba(26,18,22,.45);--line:#EEE6E3;--line2:#E2D8D5;
+  --bloom:#FF2E52;--root:#C81040;--petal:#FF8FAB;--blush:#FFE9EF;--ink:#1A1216;--paper:#F6F1EE;--warm:#EEE6E2;
+  --ink60:rgba(26,18,22,.62);--ink45:rgba(26,18,22,.5);--line:#EEE6E3;--line2:#E2D8D5;
   --display:"Clash Display",ui-sans-serif,system-ui,sans-serif;
   --sans:"General Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -23,122 +38,179 @@
 html{background:var(--paper)}
 body{margin:0;font:16px/1.65 var(--sans);color:var(--ink);background:var(--paper);min-height:100vh;-webkit-font-smoothing:antialiased}
 ::selection{background:var(--blush);color:var(--ink)}
+:focus-visible{outline:2px solid var(--root);outline-offset:3px}
 a{color:var(--root);text-decoration:none}
 a:hover{text-decoration:underline;text-underline-offset:3px}
-.label{font:500 11px/1.4 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink45)}
+.label{font:500 11px/1.4 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink60)}
 .label.red{color:var(--root)}
+.glabel{font:500 12px/1.4 var(--mono);letter-spacing:.04em;color:var(--root)}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 .top{display:flex;justify-content:space-between;align-items:center;padding:22px clamp(20px,5vw,56px);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:12px;color:var(--ink);text-decoration:none!important}
-.brand .mark{width:30px;height:30px}.brand .mark svg{display:block;width:100%;height:100%}
+.brand .mark{width:30px;height:30px}
+.brand .mark svg{display:block;width:100%;height:100%}
+body.busy .brand .mark svg{animation:spin 9s linear infinite}
 .brand b{font:600 22.4px/1 var(--display);letter-spacing:-.02em}
 .seed{color:var(--bloom)}
 .studio{font:600 15px/1 var(--display);letter-spacing:-.02em;color:var(--ink);text-decoration:none!important}
-.studio span{font-weight:400;color:var(--ink60)}.studio .seed{color:var(--bloom)}
+.studio span{font-weight:400;color:var(--ink60)}
 
 main{max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,56px)}
-.hero{position:relative;display:grid;grid-template-columns:1.15fr .85fr;align-items:center;gap:32px;padding:clamp(40px,7vw,88px) 0 clamp(28px,4vw,48px)}
-.hero h1{font:600 clamp(40px,6.2vw,76px)/.98 var(--display);letter-spacing:-.035em;margin:14px 0 18px}
-.hero h1 em{font-style:normal;color:var(--bloom)}
-.hero p{font-size:17px;color:var(--ink60);max-width:520px;margin:0}
-.flower{position:relative;justify-self:center;width:min(360px,80%);aspect-ratio:1}
-.flower svg{width:100%;height:100%;display:block;overflow:visible}
-.flower .wrap{width:100%;height:100%;transform-origin:50% 50%;animation:unfurl .6s var(--ease) both,breathe 6s ease-in-out .6s infinite}
-.flower .ring{transform-origin:100px 100px;transform-box:view-box}
-body.busy .flower .r0{animation:spin 60s linear infinite}
-body.busy .flower .r1{animation:spin 48s linear infinite reverse}
-body.busy .flower .r2{animation:spin 36s linear infinite}
-body.busy .flower .r3{animation:spin 28s linear infinite reverse}
-@keyframes unfurl{from{transform:scale(.6) rotate(-24deg);opacity:0}to{transform:none;opacity:1}}
-@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
-@keyframes spin{to{transform:rotate(360deg)}}
+.hero{display:grid;grid-template-columns:1.2fr .8fr;align-items:center;gap:40px;padding:clamp(36px,6vw,80px) 0 clamp(28px,4vw,44px)}
+.hero h1{font:600 clamp(34px,5vw,60px)/1.02 var(--display);letter-spacing:-.03em;margin:14px 0 18px}
+.hero p{font-size:17px;color:var(--ink60);max-width:540px;margin:0}
+.sample{position:relative;background:var(--warm);border-radius:22px;padding:26px 24px}
+.sample .row{display:grid;grid-template-columns:52px minmax(0,1fr);gap:16px;align-items:center}
+.sample .name{font:500 14px/1.4 var(--mono)}
+.sample .name span{color:var(--root)}
+.sample .track .fill{width:100%;animation:grow 1.6s var(--ease) .3s both}
+.sample .track .dot{left:100%;transform:scale(1);animation:slide 1.6s var(--ease) .3s both}
+@keyframes grow{from{width:0}to{width:100%}}
+@keyframes slide{from{left:0}to{left:100%}}
 .spr{position:absolute;pointer-events:none}
 .spr svg{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-.drop{position:relative;border:1.5px dashed var(--line2);border-radius:22px;background:var(--warm);padding:clamp(32px,5vw,52px) 24px;text-align:center;cursor:pointer;transition:border-color .24s var(--settle),background .24s var(--settle)}
-.drop:hover,.drop:focus-visible,.drop.over{border-color:var(--bloom);background:var(--blush);outline:none}
+.drop{position:relative;border:1.5px dashed var(--line2);border-radius:22px;background:var(--warm);padding:clamp(28px,5vw,48px) 24px;text-align:center;cursor:pointer;transition:border-color .24s var(--settle),background .24s var(--settle)}
+.drop:hover,.drop.over{border-color:var(--bloom);background:var(--blush)}
+.drop:focus-visible{border-color:var(--root);outline-offset:4px}
 .drop h2{font:600 24px/1.1 var(--display);letter-spacing:-.02em;margin:0 0 6px}
 .drop p{margin:0;color:var(--ink60);font-size:15px}
-.drop .pick{display:inline-block;margin-top:18px}
-.formats{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin-top:18px}
+.drop .pick{margin-top:18px}
+.formats{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:6px 12px;margin-top:22px}
+.formats .fmts{font:400 13px/1.4 var(--mono);color:var(--ink60);word-spacing:6px}
+.drop .limits{margin-top:8px;font:400 12px/1.5 var(--mono);color:var(--ink60)}
 
-.btn{appearance:none;border:0;border-radius:999px;padding:12px 22px;font:500 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:background .24s var(--settle),color .24s var(--settle),transform .24s var(--ease);text-decoration:none!important;display:inline-flex;align-items:center;gap:8px}
+.btn{appearance:none;border:0;border-radius:999px;padding:12px 22px;font:600 15px/1 var(--sans);cursor:pointer;transition:background .24s var(--settle),color .24s var(--settle),box-shadow .24s var(--settle),transform .24s var(--ease);text-decoration:none!important;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
 .btn.primary{background:var(--bloom);color:#fff}
 .btn.primary:hover{background:var(--root)}
 .btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2)}
 .btn.ghost:hover{box-shadow:inset 0 0 0 1px var(--ink)}
+.btn.small{padding:9px 14px;font-size:14px}
 .btn:active{transform:scale(.97)}
 .btn:disabled{opacity:.4;cursor:default}
+.btn[hidden]{display:none}
 
-.bar{display:flex;flex-wrap:wrap;gap:16px;align-items:end;justify-content:space-between;margin:34px 0 14px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.bar[hidden],.quota[hidden]{display:none}
+.bar{margin:34px 0 6px;padding-bottom:18px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:20px}
+.mode{border:0;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode legend{padding:0;margin-bottom:10px}
+.mode label{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;box-shadow:inset 0 0 0 1px var(--line2);cursor:pointer;transition:box-shadow .24s var(--settle),background .24s var(--settle)}
+.mode label:has(input:checked){box-shadow:inset 0 0 0 1.5px var(--bloom);background:var(--blush)}
+.mode input{accent-color:var(--bloom);margin:4px 0 0;width:16px;height:16px;flex:none}
+.mode b{display:block;font-weight:600}
+.mode small{display:block;font-size:14px;color:var(--ink60);line-height:1.45}
+.row2{display:flex;flex-wrap:wrap;gap:16px;align-items:end;justify-content:space-between}
 .opts{display:flex;flex-wrap:wrap;gap:18px;align-items:end}
 .field{display:flex;flex-direction:column;gap:6px}
-.field input[type=number]{width:110px}
+.field[hidden],.check[hidden]{display:none}
+.field input[type=number]{width:120px}
 input,select{font:inherit;color:var(--ink)}
 input[type=number],select{background:var(--paper);border:1px solid var(--line2);border-radius:12px;padding:9px 12px;font:400 14px/1.2 var(--sans);transition:border-color .24s var(--settle)}
 input[type=number]{font-family:var(--mono)}
-input[type=number]:focus,select:focus{outline:none;border-color:var(--bloom)}
+input[type=number]:hover,select:hover{border-color:var(--ink45)}
 .check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink60);padding-bottom:9px;cursor:pointer}
 .check input{accent-color:var(--bloom);width:16px;height:16px}
-.actions{display:flex;gap:10px;align-items:center}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.quota{font-size:13px;color:var(--ink60);margin:10px 0 0}
+#ts:not(:empty){margin-top:4px}
 
 .list{display:flex;flex-direction:column}
 .item{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:18px;align-items:center;padding:18px 0;border-bottom:1px solid var(--line);animation:seedIn .24s var(--ease) both}
 @keyframes seedIn{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
-.thumb{width:56px;height:56px;border-radius:14px;background:var(--warm);display:grid;place-items:center;overflow:hidden;font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink45)}
+.thumb{width:56px;height:56px;border-radius:14px;background:var(--warm);display:grid;place-items:center;overflow:hidden;font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink60)}
+.sample .thumb{width:52px;height:52px;background:var(--paper)}
 .thumb img{width:100%;height:100%;object-fit:cover}
 .name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:2px;font-size:13px;color:var(--ink60)}
 .meta .num{font-size:12px}
-.tag{font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;padding:5px 8px;border-radius:999px}
+.tag{font:500 11px/1 var(--mono);padding:5px 9px;border-radius:999px}
 .tag.cloud{background:var(--blush);color:var(--root)}
 .tag.local{box-shadow:inset 0 0 0 1px var(--line2);color:var(--ink)}
 .status{font-size:13px}
-.item.err .status{color:var(--root)}
+.item.err .status,.item.blocked .status{color:var(--root)}
+.item.off .name{color:var(--ink60)}
 .track{position:relative;height:14px;margin-top:6px}
 .track::before{content:"";position:absolute;left:0;right:0;top:6px;height:1px;background:var(--line2)}
 .track .fill{position:absolute;left:0;top:5.5px;height:2px;width:0;background:var(--bloom);transition:width .4s var(--settle)}
 .track .dot{position:absolute;top:3px;left:0;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--bloom);transform:scale(0);transition:left .4s var(--settle),transform .24s var(--ease)}
 .item.busy .track .dot,.item.done .track .dot{transform:scale(1)}
 .item.err .track .fill,.item.err .track .dot{background:var(--root)}
-.item .actions select{max-width:190px}
-.x{appearance:none;background:none;border:0;color:var(--ink45);font-size:22px;line-height:1;padding:4px 6px;cursor:pointer;border-radius:8px}
+.item select{display:none}
+.item .actions{grid-column:3;grid-row:1}
+.into{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:-4px}
+.into .label{margin-right:4px}
+.into .fix{margin-left:auto}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{appearance:none;border:0;background:var(--paper);box-shadow:inset 0 0 0 1px var(--line2);color:var(--ink);font:500 14px/1 var(--sans);padding:10px 15px;border-radius:999px;cursor:pointer;transition:box-shadow .24s var(--settle),background .24s var(--settle),color .24s var(--settle)}
+.chip:hover{box-shadow:inset 0 0 0 1px var(--ink45)}
+.chip[aria-checked=true]{background:var(--blush);color:var(--root);box-shadow:inset 0 0 0 1.5px var(--bloom)}
+.chip:focus-visible{outline:2px solid var(--bloom);outline-offset:2px}
+.item.busy .into{opacity:.5;pointer-events:none}
+.item.done .into{display:none}
+.x{appearance:none;background:none;border:0;color:var(--ink60);font-size:22px;line-height:1;padding:4px 8px;cursor:pointer;border-radius:8px}
 .x:hover{color:var(--ink)}
-.dl{position:relative}
 
-.how{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:72px 0 0;border-top:1px solid var(--line)}
-.how div{padding:24px 24px 24px 0}
-.how div+div{padding-left:24px;border-left:1px solid var(--line)}
-.how h3{font:600 20px/1.15 var(--display);letter-spacing:-.02em;margin:10px 0 8px}
+section h2{font:600 clamp(26px,3.4vw,36px)/1.1 var(--display);letter-spacing:-.025em;margin:0 0 20px}
+.article{margin:72px 0 0;max-width:680px}
+.article p{color:var(--ink60);margin:0 0 14px}
+.how{margin:72px 0 0}
+.how .cols{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+.how .cols>div{padding:22px 24px 22px 0}
+.how .cols>div+div{padding-left:24px;border-left:1px solid var(--line)}
+.how h3{font:600 20px/1.15 var(--display);letter-spacing:-.02em;margin:8px 0 8px}
 .how p{margin:0;font-size:15px;color:var(--ink60)}
 .how ul{list-style:none;padding:0;margin:12px 0 0;font-size:14px;color:var(--ink60)}
 .how li{position:relative;padding-left:16px;margin:4px 0}
 .how li::before{content:"";position:absolute;left:0;top:.62em;width:7px;height:7px;border-radius:50%;background:var(--bloom)}
+.faq{margin:72px 0 0;max-width:760px}
+.faq details{border-top:1px solid var(--line);padding:16px 0}
+.faq details:last-child{border-bottom:1px solid var(--line)}
+.faq summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:16px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font:400 20px/1 var(--mono);color:var(--root);transition:transform .24s var(--ease)}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq p{margin:10px 0 0;color:var(--ink60)}
+.more{margin:72px 0 0}
+.more nav{display:flex;flex-wrap:wrap;gap:10px}
+.more a{font:500 13px/1 var(--mono);color:var(--ink);padding:10px 14px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line2);text-decoration:none}
+.more a:hover{box-shadow:inset 0 0 0 1px var(--root);color:var(--root)}
+.more a[aria-current]{background:var(--blush);box-shadow:none;color:var(--root)}
 
 .manifest{margin:72px 0 0;padding:36px;background:var(--warm);border-radius:22px;display:flex;flex-wrap:wrap;gap:18px 40px;align-items:center;justify-content:space-between}
-.manifest p{margin:0;font:600 clamp(22px,3vw,30px)/1.1 var(--display);letter-spacing:-.02em;max-width:620px}
-.manifest p em{font-style:normal;color:var(--bloom)}
+.manifest p{margin:0;font:600 clamp(22px,3vw,30px)/1.15 var(--display);letter-spacing:-.02em;max-width:640px}
 
-footer{max-width:1080px;margin:72px auto 0;padding:22px clamp(20px,5vw,56px) 36px;display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;border-top:1px solid var(--line)}
-footer a{color:var(--ink45)}
+footer{max-width:1080px;margin:72px auto 0;padding:22px clamp(20px,5vw,56px) 36px;display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-between;border-top:1px solid var(--line);font-size:14px;color:var(--ink60)}
+footer p{margin:0}
+footer a{color:var(--ink60)}
 footer a:hover{color:var(--root)}
-#ts{margin-top:16px}
+footer .legal{display:flex;flex-wrap:wrap;gap:6px 18px;width:100%}
 
 .pop{position:fixed;pointer-events:none;z-index:9;animation:pop .9s var(--ease) both}
 @keyframes pop{0%{transform:translate(0,0) scale(.2);opacity:0}30%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
 
 @media (max-width:820px){
-  .hero{grid-template-columns:1fr}
-  .flower{order:-1;width:min(220px,60%)}
-  .how{grid-template-columns:1fr}
-  .how div+div{padding-left:0;border-left:0;border-top:1px solid var(--line)}
+  .hero{grid-template-columns:1fr;gap:24px}
+  .how .cols{grid-template-columns:1fr}
+  .how .cols>div+div{padding-left:0;border-left:0;border-top:1px solid var(--line)}
   .spr{display:none}
 }
 @media (max-width:620px){
+  .hero{padding:24px 0 20px}
+  .hero p{font-size:15px}
+  .sample{display:none}
+  .mode{grid-template-columns:1fr}
   .item{grid-template-columns:44px minmax(0,1fr)}
   .thumb{width:44px;height:44px;border-radius:12px}
-  .item .actions{grid-column:1/-1;justify-content:flex-end}
+  .item{row-gap:10px}
+  .item .thumb{align-self:start}
+  .item{grid-template-columns:44px minmax(0,1fr) auto}
+  .into{grid-column:1/-1;margin-top:0}
+  .into .label{width:100%}
+  .chip{padding:12px 16px;font-size:15px}
+  .item.done .actions{grid-column:2/-1;grid-row:2;justify-content:flex-start}
+  .item.done .actions .x{margin-left:auto}
   .studio{display:none}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -146,85 +218,114 @@ footer a:hover{color:var(--root)}
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/" aria-label="convert"><span class="mark" id="mark"></span><b>convert<span class="seed">.</span></b></a>
-  <a class="studio" href="https://shiftbloom.studio" target="_blank" rel="noopener">shiftbloom <span>studio</span><span class="seed">.</span></a>
+  <a class="brand" href="/" aria-label="convert, start page"><span class="mark" id="mark"></span><b>convert<span class="seed">.</span></b></a>
+  <a class="studio" href="https://shiftbloom.studio" rel="noopener">shiftbloom <span>studio</span><span class="seed">.</span></a>
 </header>
 
 <main>
   <section class="hero">
     <div>
-      <div class="label red">Werkzeug · Bild · Video · Audio</div>
-      <h1>Dateien umwandeln, ohne Umwege<em>.</em></h1>
-      <p>Datei rein, Format wählen, fertig. Cloud-Formate laufen auf Cloudflare, lokale Formate komplett in deinem Browser. Ergebnisse löschen wir nach 24&nbsp;Stunden, ganz ohne Konto.</p>
+      <div class="label red">results deleted after 24 h</div>
+      <h1>__H1__</h1>
+      <p>__LEAD__</p>
     </div>
-    <div class="flower" id="flower"></div>
+    __EXAMPLE__
   </section>
 
-  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Dateien auswählen">
-    <h2>Dateien hier ablegen<span class="seed">.</span></h2>
-    <p>Oder klicken, auswählen, einfügen. Mehrere auf einmal gehen auch.</p>
-    <span class="btn primary pick">Dateien auswählen</span>
-    <div class="formats label">
-      <span>png</span><span>jpg</span><span>webp</span><span>avif</span><span>gif</span><span>heic</span><span>mp4</span><span>mov</span><span>webm</span><span>mkv</span><span>mp3</span><span>wav</span><span>flac</span>
-    </div>
-    <input type="file" id="file" multiple hidden accept="image/*,video/*,audio/*,.mkv,.mov,.heic">
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose files to convert">
+    <h2>Drop files here</h2>
+    <p>or pick them from a folder. Several at once is fine.</p>
+    <span class="btn primary pick">Choose files</span>
+    <div class="formats"><span class="label">opens</span><span class="fmts">png jpg webp avif heic mp4 mov webm mkv mp3 wav flac</span></div>
+    <p class="limits">on cloudflare: images up to 20 mb, video up to 200 mb and 10 min. in-browser formats are limited by your device's memory.</p>
+    <input type="file" id="file" multiple hidden accept="image/*,video/*,audio/*,.mkv,.mov,.heic,.heif">
   </div>
+
+  <div class="list" id="list"></div>
 
   <div class="bar" id="bar" hidden>
-    <div class="opts">
-      <label class="field"><span class="label">Qualität</span><input type="number" id="quality" min="1" max="100" value="85"></label>
-      <label class="field"><span class="label">Max. Breite (px)</span><input type="number" id="width" min="0" max="12000" placeholder="original"></label>
-      <label class="check"><input type="checkbox" id="mute"> Ton entfernen</label>
+    <fieldset class="mode">
+      <legend class="label">Where to convert</legend>
+      <label><input type="radio" name="mode" value="cloud" checked><span><b>On Cloudflare</b><small>Faster. Files get uploaded, and video results stay for 24 hours.</small></span></label>
+      <label><input type="radio" name="mode" value="local"><span><b>In your browser</b><small>Slower, but nothing leaves your device.</small></span></label>
+    </fieldset>
+    <div class="row2">
+      <div class="opts">
+        <label class="field" id="f-quality"><span class="label">Quality</span><input type="number" id="quality" min="1" max="100" value="85"></label>
+        <label class="field" id="f-width"><span class="label">Max width (px)</span><input type="number" id="width" min="0" max="12000" placeholder="original"></label>
+        <label class="check" id="f-mute"><input type="checkbox" id="mute"> Remove audio</label>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="clear">Clear list</button>
+        <button class="btn ghost" id="all" hidden>Download all</button>
+        <button class="btn primary" id="go">Convert</button>
+      </div>
     </div>
-    <div class="actions">
-      <button class="btn ghost" id="clear">Leeren</button>
-      <button class="btn primary" id="go">Alle umwandeln</button>
-    </div>
+    <div id="ts"></div>
   </div>
-  <div class="list" id="list"></div>
-  <div id="ts"></div>
+  <p class="quota" id="quota" hidden></p>
+
+  __ARTICLE__
 
   <section class="how">
-    <div>
-      <div class="label red">01 · Cloud</div>
-      <h3>Bilder</h3>
-      <p>Über Cloudflare Images, mit Qualität und maximaler Breite.</p>
-      <ul><li>PNG, JPG, WebP, AVIF</li><li>bis 25 MB pro Bild</li></ul>
+    <h2>Where your file goes</h2>
+    <div class="cols">
+      <div>
+        <span class="glabel">01 · cloudflare</span>
+        <h3>Images</h3>
+        <p>Cloudflare Images re-encodes them. You set the quality and a maximum width.</p>
+        <ul><li>PNG, JPG, WebP, AVIF</li><li>up to 20 MB per image</li></ul>
+      </div>
+      <div>
+        <span class="glabel">02 · cloudflare</span>
+        <h3>Video</h3>
+        <p>Stream and Media Transformations do the work, and a Workflow keeps an eye on each job.</p>
+        <ul><li>MP4 (H.264), M4A audio, still frames</li><li>up to 200 MB and 10 minutes</li></ul>
+      </div>
+      <div>
+        <span class="glabel">03 · your browser</span>
+        <h3>Everything else</h3>
+        <p>ffmpeg.wasm runs inside this tab. Nothing gets uploaded, which also means your laptop does the work.</p>
+        <ul><li>WebM, GIF, MP3, WAV, OGG, MP4</li><li>as big as your memory allows</li></ul>
+      </div>
     </div>
-    <div>
-      <div class="label red">02 · Cloud</div>
-      <h3>Videos</h3>
-      <p>Über Media Transformations und Stream, gesteuert von einem Workflow.</p>
-      <ul><li>MP4 (H.264), M4A, Standbild</li><li>bis 200 MB, max. 10 Minuten</li></ul>
-    </div>
-    <div>
-      <div class="label red">03 · Lokal</div>
-      <h3>Im Browser</h3>
-      <p>Mit ffmpeg.wasm direkt auf deinem Gerät. Nichts wird hochgeladen.</p>
-      <ul><li>WebM, GIF, MP3, WAV, OGG, MP4</li><li>auch für große Dateien</li></ul>
-    </div>
+  </section>
+
+  <section class="faq">
+    <h2>Questions people ask</h2>
+    __FAQ__
+  </section>
+
+  <section class="more">
+    <h2>Common conversions</h2>
+    <nav aria-label="Common conversions">__LINKS__</nav>
   </section>
 
   <section class="manifest">
-    <p>Offen, kostenlos und <em>ohne Konto</em>. Ein kleines Werkzeug aus dem Garten.</p>
-    <a class="btn ghost" href="https://github.com/shiftbloom-studio/convert" target="_blank" rel="noopener">Quellcode ansehen</a>
+    <p>convert costs nothing and doesn't want your email address. The code is on GitHub if you'd rather run it yourself.</p>
+    <a class="btn ghost" href="https://github.com/shiftbloom-studio/convert" rel="noopener">Read the code</a>
   </section>
 </main>
 
 <footer>
-  <span class="label">Hamburg · 53.55°N 9.99°E · Every commit helps something bloom</span>
-  <span class="label"><a href="https://shiftbloom.studio" target="_blank" rel="noopener">shiftbloom.studio</a> · fair use · <span class="num">24 h</span> retention</span>
+  <p>Made by <a href="https://shiftbloom.studio" rel="noopener">shiftbloom studio</a> in Hamburg. every commit helps something bloom<span class="seed">.</span></p>
+  <p>Converted files are deleted after 24 hours.</p>
+  <nav class="legal" aria-label="Legal"><a href="/privacy">Privacy</a><a href="/datenschutz" hreflang="de" lang="de">Datenschutz</a><a href="/imprint">Imprint</a><a href="/impressum" hreflang="de" lang="de">Impressum</a></nav>
 </footer>
 
 <script>
 const SITEKEY = "__SITEKEY__";
-const $ = (s) => document.querySelector(s);
+const PRESET = __PRESET__;
+const $ = (s, r = document) => r.querySelector(s);
 const MB = 1024 * 1024;
+const LIM = { image: 20 * MB, video: 200 * MB, mp4: 100 * MB, seconds: 600 };
 const fmtSize = (b) => b >= MB ? (b / MB).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
-const ext = (n) => (n.split(".").pop() || "").toLowerCase();
+const ext = (n) => (n.includes(".") ? n.split(".").pop() : "").toLowerCase();
+const isMp4 = (f) => f.type === "video/mp4" || /\.(mp4|m4v)$/i.test(f.name);
+const E = (msg, detail) => Object.assign(new Error(msg), { detail });
 
-// ---- The Bloom: the exact mark from shiftbloom.studio (four petal rings + seed, 10·10·8·6).
-// Gradient from 32px up, solid Bloom Red below. Rings are grouped (.ring.r0 … .r3) for motion.
+// ---- The Bloom: the exact mark from shiftbloom.studio (four petal rings + seed, 10·10·8·6),
+// gradient from 32px up, solid Bloom Red below. Plus the sprinkles, from the brand spec.
 function bloom(id, solid) {
   const rings = [
     { r: 100, n: 10, w: 32, l: 90, a: "#D8163F", b: "#FF2E52", rot: 0 },
@@ -234,27 +335,22 @@ function bloom(id, solid) {
   ];
   const f = (v) => +v.toFixed(2);
   let defs = "", body = "";
-  rings.forEach((g, i) => {
+  for (const g of rings) {
     const c = f(0.55 * g.l), d = `M 0,0 C ${g.w},0 ${g.w},${-c} 0,${-g.l} C ${-g.w},${-c} ${-g.w},0 0,0 Z`;
     const fill = solid ? "#FF2E52" : `url(#${id}-${g.r})`;
     if (!solid) defs += `<linearGradient id="${id}-${g.r}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${-g.l}"><stop offset="0%" stop-color="${g.a}"/><stop offset="100%" stop-color="${g.b}"/></linearGradient>`;
-    let ps = "";
-    for (let k = 0; k < g.n; k++) ps += `<path d="${d}" fill="${fill}" transform="translate(100 100) rotate(${f(g.rot + (360 / g.n) * k)}) translate(0 ${-f(g.r - g.l)})"/>`;
-    body += `<g class="ring r${i}">${ps}</g>`;
-  });
-  body += `<circle cx="100" cy="100" r="7" fill="#FF2E52"/>`;
-  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${defs ? `<defs>${defs}</defs>` : ""}${body}</svg>`;
+    for (let k = 0; k < g.n; k++) body += `<path d="${d}" fill="${fill}" transform="translate(100 100) rotate(${f(g.rot + (360 / g.n) * k)}) translate(0 ${-f(g.r - g.l)})"/>`;
+  }
+  return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${defs ? `<defs>${defs}</defs>` : ""}${body}<circle cx="100" cy="100" r="7" fill="#FF2E52"/></svg>`;
 }
 const SPARK = (s, c) => `<svg width="${s}" height="${s}" viewBox="-10 -10 20 20"><path d="M0-10C1-2 2-1 10 0 2 1 1 2 0 10-1 2-2 1-10 0-2-1-1-2 0-10Z" fill="${c}"/></svg>`;
 const CROSS = (s, c) => `<svg width="${s}" height="${s}" viewBox="-5 -5 10 10"><path d="M-1.4-5h2.8v3.6H5v2.8H1.4V5h-2.8V1.4H-5v-2.8h3.6z" fill="${c}"/></svg>`;
 const DOT = (s, c) => `<svg width="${s}" height="${s}" viewBox="-5 -5 10 10"><circle r="5" fill="${c}"/></svg>`;
-$("#mark").innerHTML = bloom("m", false);
-$("#flower").innerHTML = `<div class="wrap">${bloom("h", false)}</div>`;
-// Sprinkles in the margins of the hero: four of the allowed seven.
-[["-6%", "8%", SPARK(22, "#FF2E52")], ["92%", "2%", CROSS(12, "#1A1216")], ["98%", "70%", DOT(7, "#FF2E52")], ["4%", "92%", SPARK(14, "#1A1216")]]
-  .forEach(([l, t, s]) => { const d = document.createElement("span"); d.className = "spr"; d.style.left = l; d.style.top = t; d.innerHTML = s; $("#flower").append(d); });
+$("#mark").innerHTML = bloom("sb-bloom-ring", false);
+const sample = $(".sample");
+if (sample) [["-14px", "-12px", SPARK(20, "#FF2E52")], ["calc(100% - 4px)", "18%", CROSS(11, "#1A1216")], ["88%", "calc(100% + 6px)", DOT(7, "#FF2E52")]]
+  .forEach(([l, t, s]) => { const d = document.createElement("span"); d.className = "spr"; d.style.left = l; d.style.top = t; d.innerHTML = s; sample.append(d); });
 
-// Scatter sparingly: only when a file actually finished.
 function scatter(el) {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const r = el.getBoundingClientRect();
@@ -266,79 +362,236 @@ function scatter(el) {
   });
 }
 
+// ---- Targets per input kind and place. The third value is the output, used to keep the
+// choice when a row switches between Cloudflare and the browser.
 const T = {
-  image: [["webp", "WebP", "cloud"], ["avif", "AVIF", "cloud"], ["png", "PNG", "cloud"], ["jpeg", "JPG", "cloud"]],
-  video: [
-    ["mp4", "MP4 (H.264)", "cloud"], ["m4a", "M4A Audio", "cloud"], ["jpg", "Standbild JPG", "cloud"], ["png", "Standbild PNG", "cloud"],
-    ["webm", "WebM", "local"], ["gif", "GIF", "local"], ["mp3", "MP3 Audio", "local"], ["mp4l", "MP4", "local"],
-  ],
-  audio: [["mp3", "MP3", "local"], ["wav", "WAV", "local"], ["ogg", "OGG", "local"], ["m4al", "M4A", "local"]],
+  image: {
+    cloud: [["webp", "WebP", "webp"], ["avif", "AVIF", "avif"], ["png", "PNG", "png"], ["jpeg", "JPG", "jpg"]],
+    local: [["webpl", "WebP", "webp"], ["pngl", "PNG", "png"], ["jpgl", "JPG", "jpg"]],
+  },
+  video: {
+    cloud: [["mp4", "MP4 (H.264)", "mp4"], ["m4a", "M4A audio", "m4a"], ["jpg", "Still frame (JPG)", "stilljpg"], ["png", "Still frame (PNG)", "stillpng"]],
+    local: [["mp4l", "MP4 (H.264)", "mp4"], ["webm", "WebM", "webm"], ["gif", "GIF", "gif"], ["mp3", "MP3 audio", "mp3"], ["framel", "Still frame (PNG)", "stillpng"]],
+  },
+  audio: { cloud: [], local: [["mp3", "MP3", "mp3"], ["wav", "WAV", "wav"], ["ogg", "OGG", "ogg"], ["m4al", "M4A", "m4a"]] },
 };
+const scale = (o, h) => (o.width ? ["-vf", `scale='min(${o.width},iw)':${h}`] : []);
 const LOCAL = {
-  webm: { ext: "webm", type: "video/webm", args: (o) => [...(o.width ? ["-vf", `scale='min(${o.width},iw)':-2`] : []), "-c:v", "libvpx", "-b:v", "1.5M", "-deadline", "realtime", "-cpu-used", "8", ...(o.mute ? ["-an"] : ["-c:a", "libvorbis"])] },
+  webm: { ext: "webm", type: "video/webm", args: (o) => [...scale(o, -2), "-c:v", "libvpx", "-b:v", "1.5M", "-deadline", "realtime", "-cpu-used", "8", ...(o.mute ? ["-an"] : ["-c:a", "libvorbis"])] },
   gif: { ext: "gif", type: "image/gif", args: (o) => ["-vf", `fps=12,scale='min(${o.width || 480},iw)':-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse`, "-loop", "0"] },
   mp3: { ext: "mp3", type: "audio/mpeg", args: () => ["-vn", "-c:a", "libmp3lame", "-q:a", "2"] },
   wav: { ext: "wav", type: "audio/wav", args: () => ["-vn"] },
   ogg: { ext: "ogg", type: "audio/ogg", args: () => ["-vn", "-c:a", "libvorbis", "-q:a", "5"] },
   m4al: { ext: "m4a", type: "audio/mp4", args: () => ["-vn", "-c:a", "aac", "-b:a", "192k"] },
-  mp4l: { ext: "mp4", type: "video/mp4", args: (o) => [...(o.width ? ["-vf", `scale='min(${o.width},iw)':-2`] : []), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", ...(o.mute ? ["-an"] : ["-c:a", "aac"])] },
+  mp4l: { ext: "mp4", type: "video/mp4", args: (o) => [...scale(o, -2), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", ...(o.mute ? ["-an"] : ["-c:a", "aac"])] },
+  framel: { ext: "png", type: "image/png", args: (o) => [...scale(o, -1), "-frames:v", "1"] },
+  pngl: { ext: "png", type: "image/png", args: (o) => [...scale(o, -1), "-frames:v", "1"] },
+  jpgl: { ext: "jpg", type: "image/jpeg", args: (o) => [...scale(o, -1), "-frames:v", "1", "-q:v", String(Math.max(2, Math.round(31 - o.quality * 0.29)))] },
+  webpl: { ext: "webp", type: "image/webp", args: (o) => [...scale(o, -1), "-frames:v", "1", "-c:v", "libwebp", "-quality", String(o.quality)] },
 };
 
 const items = [];
+let globalMode = PRESET && PRESET.mode === "local" ? "local" : "cloud";
+document.querySelector(`input[name=mode][value=${globalMode}]`).checked = true;
+
 const kindOf = (f) => {
-  const t = f.type || "";
-  if (t.startsWith("image/") || ["png","jpg","jpeg","webp","avif","gif","bmp","tif","tiff","heic"].includes(ext(f.name))) return "image";
-  if (t.startsWith("video/") || ["mp4","mov","m4v","webm","mkv","avi"].includes(ext(f.name))) return "video";
-  if (t.startsWith("audio/") || ["mp3","wav","ogg","flac","m4a","aac","opus"].includes(ext(f.name))) return "audio";
+  const t = f.type || "", e = ext(f.name);
+  if (t.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "avif", "gif", "bmp", "tif", "tiff", "heic", "heif"].includes(e)) return "image";
+  if (t.startsWith("video/") || ["mp4", "mov", "m4v", "webm", "mkv", "avi"].includes(e)) return "video";
+  if (t.startsWith("audio/") || ["mp3", "wav", "ogg", "flac", "m4a", "aac", "opus"].includes(e)) return "audio";
   return null;
 };
-const updateBusy = () => document.body.classList.toggle("busy", items.some((i) => i.state === "busy"));
+const modeOf = (it, m = it.mode || globalMode) => (T[it.kind][m].length ? m : m === "cloud" ? "local" : "cloud");
+const outOf = (it, m, key) => (T[it.kind][m].find((o) => o[0] === key) || [])[2];
+function defaultTarget(it, m) {
+  const list = T[it.kind][m];
+  if (PRESET && PRESET.kind === it.kind) {
+    const want = outOf({ kind: it.kind }, PRESET.mode, PRESET.target) || PRESET.target;
+    const hit = list.find((o) => o[0] === PRESET.target || o[2] === want);
+    if (hit && !(it.ext === want)) return hit[0];
+  }
+  const e = it.ext === "jpeg" ? "jpg" : it.ext;
+  const firstOther = list.find((o) => o[2] !== e) || list[0];
+  if (it.kind === "image") return (list.find((o) => o[2] === "webp" && e !== "webp") || list.find((o) => o[2] === "png") || firstOther)[0];
+  if (it.kind === "video") return list.find((o) => o[2] === "mp4")[0];
+  return firstOther[0];
+}
+
+// Checks a row against the limits of the place it would be converted in.
+function check(it, m = modeOf(it), t = it.sel.value) {
+  const f = it.file, mb = Math.round(f.size / MB), unreadable = ["heic", "heif", "avif"].includes(it.ext);
+  if (m === "cloud") {
+    if (it.kind === "image" && f.size > LIM.image)
+      return unreadable ? { block: 1, msg: `This image is ${fmtSize(f.size)}. Cloudflare takes up to 20 MB.` }
+        : { block: 1, msg: `This image is ${fmtSize(f.size)}. Cloudflare takes up to 20 MB.`, fix: "local" };
+    if (it.kind === "video") {
+      if (f.size > LIM.video) return { block: 1, msg: `This video is ${fmtSize(f.size)}. Cloudflare takes up to 200 MB.`, fix: "local" };
+      if (it.duration > LIM.seconds) return { block: 1, msg: `This video is ${Math.round(it.duration / 60)} minutes long and Cloudflare stops at 10. Pick an in-browser format instead. It's slower but has no time limit.`, fix: "local" };
+      if ((t === "jpg" || t === "png") && !(isMp4(f) && f.size <= LIM.mp4)) return { block: 1, msg: "Cloudflare only takes still frames from MP4s up to 100 MB. Your browser can do it with any video.", fix: "local" };
+    }
+  } else {
+    if (it.kind === "image" && unreadable)
+      return f.size <= LIM.image ? { block: 1, msg: `Your browser can't read ${it.ext.toUpperCase()}. Cloudflare can, and it doesn't keep the image.`, fix: "cloud" }
+        : { block: 1, msg: `Your browser can't read ${it.ext.toUpperCase()}, and at ${mb} MB it is too big for Cloudflare. Export it as JPG first.` };
+    if (f.size > LIM.video && matchMedia("(pointer: coarse)").matches) return { msg: "Phones often run out of memory above 200 MB, a computer is safer for this one." };
+  }
+  return null;
+}
+const canGo = (it) => (it.state === "idle" || it.state === "error") && !(check(it) || {}).block;
+
+// Targets offered for a row. Audio skips its own format (WAV to WAV does nothing useful);
+// images and video keep it, because re-encoding there shrinks or resizes the file.
+function targets(it, m) {
+  const e = it.ext === "jpeg" ? "jpg" : it.ext, list = T[it.kind][m];
+  const other = it.kind === "audio" ? list.filter((o) => o[2] !== e) : list;
+  return other.length ? other : list;
+}
+function fill(it) {
+  const m = modeOf(it), prev = it.sel.value && outOf(it, it.selMode, it.sel.value);
+  it.sel.innerHTML = targets(it, m).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+  const keep = prev && targets(it, m).find((o) => o[2] === prev);
+  it.sel.value = keep ? keep[0] : defaultTarget(it, m);
+  it.selMode = m;
+  renderChips(it);
+}
+// The format picker: one chip per target, backed by the hidden select.
+function renderChips(it) {
+  const box = $(".chips", it.el);
+  box.replaceChildren(...[...it.sel.options].map((o) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.setAttribute("role", "radio"); b.dataset.v = o.value; b.textContent = o.textContent;
+    b.onclick = () => pickChip(it, o.value);
+    return b;
+  }));
+  box.onkeydown = (e) => {
+    const opts = [...it.sel.options], i = opts.findIndex((o) => o.value === it.sel.value);
+    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: -i, End: opts.length - 1 - i }[e.key];
+    if (d === undefined) return;
+    e.preventDefault();
+    pickChip(it, opts[(i + d + opts.length) % opts.length].value);
+    $(`.chip[aria-checked=true]`, box).focus();
+  };
+  syncChips(it);
+}
+function pickChip(it, v) {
+  if (it.state === "busy" || it.state === "done" || it.sel.value === v) return;
+  it.sel.value = v; it.sel.dispatchEvent(new Event("change"));
+}
+function syncChips(it) {
+  for (const b of it.el.querySelectorAll(".chip")) {
+    const on = b.dataset.v === it.sel.value;
+    b.setAttribute("aria-checked", on); b.tabIndex = on ? 0 : -1;
+  }
+}
+function refresh(it) {
+  if (it.state === "busy" || it.state === "done") return;
+  syncChips(it);
+  const m = modeOf(it), c = check(it), tag = $(".tag", it.el);
+  tag.className = "tag " + m; tag.textContent = m === "cloud" ? "cloudflare" : "browser";
+  it.el.classList.toggle("blocked", !!(c && c.block));
+  if (it.state === "idle") { setStatus(it, c ? c.msg : "ready"); it.el.classList.remove("err"); }
+  showFix(it, c && c.fix);
+  updateBar();
+}
+function showFix(it, to) {
+  const b = $(".fix", it.el);
+  b.hidden = !to;
+  if (to) { b.textContent = to === "local" ? "Convert in your browser" : "Convert on Cloudflare"; b.onclick = () => { it.mode = to; it.state = "idle"; fill(it); refresh(it); if (!(check(it) || {}).block) convert(it); }; }
+}
+const setStatus = (it, s, title = "") => { const el = $(".status", it.el); el.textContent = s; el.title = title; };
+const setP = (it, p, status) => {
+  const v = Math.round(Math.max(0, Math.min(1, p)) * 100);
+  $(".fill", it.el).style.width = v + "%"; $(".dot", it.el).style.left = v + "%";
+  $(".track", it.el).setAttribute("aria-valuenow", v);
+  if (status) setStatus(it, status);
+};
+
+function readDuration(it) {
+  const v = document.createElement("video"), url = URL.createObjectURL(it.file);
+  v.preload = "metadata"; v.muted = true;
+  const done = () => { URL.revokeObjectURL(url); v.removeAttribute("src"); };
+  v.onloadedmetadata = () => { if (isFinite(v.duration)) { it.duration = v.duration; refresh(it); } done(); };
+  v.onerror = done; v.src = url;
+}
 
 function addFiles(files) {
   for (const f of files) {
     const kind = kindOf(f);
-    if (!kind) continue;
-    const it = { file: f, kind, state: "idle" };
     const el = document.createElement("div");
     el.className = "item";
-    const opts = T[kind].map(([v, l, w]) => `<option value="${v}" data-where="${w}">${l} · ${w === "cloud" ? "Cloud" : "Lokal"}</option>`).join("");
-    el.innerHTML = `<div class="thumb">${ext(f.name).slice(0, 4)}</div>
-      <div style="min-width:0"><div class="name"></div><div class="meta"><span class="num">${fmtSize(f.size)}</span><span class="tag"></span><span class="status">bereit</span></div><div class="track"><div class="fill"></div><div class="dot"></div></div></div>
-      <div class="actions"><select aria-label="Zielformat">${opts}</select><button class="x" title="Entfernen" aria-label="Entfernen">×</button></div>`;
-    el.querySelector(".name").textContent = f.name;
-    if (kind === "image" && f.size < 15 * MB) {
-      const img = new Image(); img.src = URL.createObjectURL(f); img.alt = "";
-      img.onerror = () => img.remove();
-      el.querySelector(".thumb").replaceChildren(img);
-    }
-    const sel = el.querySelector("select");
-    if (kind === "image" && ext(f.name) === "webp") sel.value = "png";
-    if (kind === "video" && f.size > 200 * MB) sel.value = "mp4l";
-    const tag = () => { const w = sel.selectedOptions[0].dataset.where; const t = el.querySelector(".tag"); t.className = "tag " + w; t.textContent = w === "cloud" ? "cloud" : "lokal"; };
-    sel.onchange = tag; tag();
-    el.querySelector(".x").onclick = () => { if (it.state === "busy") return; el.remove(); items.splice(items.indexOf(it), 1); $("#bar").hidden = !items.length; };
-    it.el = el; it.sel = sel;
+    el.innerHTML = `<div class="thumb"></div>
+      <div style="min-width:0"><div class="name"></div><div class="meta"><span class="num">${fmtSize(f.size)}</span><span class="tag"></span><span class="status" role="status"></span></div>
+      <div class="track" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"></div><div class="dot"></div></div></div>
+      <div class="into"><span class="label">Turn it into</span><div class="chips" role="radiogroup"></div><button class="btn ghost small fix" hidden></button></div>
+      <div class="actions"><select aria-label="Target format"></select><button class="x" title="Remove" aria-label="Remove">×</button></div>`;
+    $(".name", el).textContent = f.name;
+    $(".chips", el).setAttribute("aria-label", "Turn " + f.name + " into");
+    $(".thumb", el).textContent = ext(f.name).slice(0, 4) || "?";
+    const it = { file: f, kind, ext: ext(f.name), mode: null, state: "idle", el, sel: $("select", el) };
+    $(".x", el).onclick = () => { if (it.state === "busy") return; el.remove(); items.splice(items.indexOf(it), 1); updateBar(); };
     items.push(it);
     $("#list").append(el);
+    if (!kind) {
+      it.state = "off"; el.classList.add("off"); it.sel.remove(); $(".into", el).remove(); $(".tag", el).remove(); $(".track", el).remove();
+      setStatus(it, "convert can't open this kind of file.");
+      continue;
+    }
+    if (kind === "image" && f.size < 15 * MB) {
+      const img = new Image(); img.src = URL.createObjectURL(f); img.alt = "";
+      img.onload = () => $(".thumb", el).replaceChildren(img);
+    }
+    it.sel.onchange = () => refresh(it);
+    fill(it); refresh(it);
+    if (kind === "video") readDuration(it);
   }
-  $("#bar").hidden = !items.length;
+  updateBar(); loadQuota();
+  // Bring the first new row, and with it the format picker, into view when it lands below the fold.
+  const first = items[items.length - files.length];
+  if (first && first.el.getBoundingClientRect().bottom > innerHeight - 40) first.el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
 }
 
-const setP = (it, p, status) => {
-  const w = Math.round(Math.max(0, Math.min(1, p)) * 100) + "%";
-  it.el.querySelector(".fill").style.width = w;
-  it.el.querySelector(".dot").style.left = w;
-  if (status) it.el.querySelector(".status").textContent = status;
-};
-const fail = (it, msg) => { it.state = "error"; it.el.classList.remove("busy"); it.el.classList.add("err"); setP(it, 1, msg); updateBusy(); };
-const finish = (it, href, name, size) => {
-  it.state = "done"; it.el.classList.remove("busy"); it.el.classList.add("done"); setP(it, 1, "fertig" + (size ? " · " + fmtSize(size) : ""));
-  const a = document.createElement("a"); a.className = "btn primary dl"; a.href = href; a.download = name; a.textContent = "Download";
-  it.el.querySelector(".actions").replaceChildren(a);
-  updateBusy(); scatter(a);
-};
-const options = () => ({ quality: +$("#quality").value || 85, width: +$("#width").value || 0, mute: $("#mute").checked });
-const pct = (p) => Math.round(p * 100) + " %";
+function updateBar() {
+  const live = items.filter((i) => i.kind);
+  $("#bar").hidden = !items.length;
+  const n = items.filter(canGo).length;
+  const go = $("#go"); go.disabled = !n; go.textContent = n > 1 ? `Convert ${n} files` : n === 1 ? "Convert 1 file" : "Convert";
+  $("#f-quality").hidden = !live.some((i) => i.kind === "image");
+  $("#f-width").hidden = !live.some((i) => i.kind !== "audio");
+  $("#f-mute").hidden = !live.some((i) => i.kind === "video");
+  $("#all").hidden = items.filter((i) => i.state === "done").length < 2;
+  $("#quota").hidden = !$("#quota").textContent || !live.some((i) => modeOf(i) === "cloud");
+  document.body.classList.toggle("busy", items.some((i) => i.state === "busy"));
+}
+async function loadQuota() {
+  try {
+    const q = await (await fetch("/api/quota", { cache: "no-store" })).json();
+    $("#quota").textContent = `Cloudflare can still do ${q.images} images and ${q.videos} videos for you today.`;
+  } catch { $("#quota").textContent = ""; }
+  updateBar();
+}
+
+const actionsOf = (it) => [it.sel, $(".x", it.el)];
+function fail(it, e, m) {
+  it.state = "error"; it.el.classList.remove("busy"); it.el.classList.add("err"); it.sel.disabled = false;
+  setP(it, 1); setStatus(it, e.message || String(e), e.detail || "");
+  // Offer the other place when it can take this file.
+  const other = m === "cloud" ? "local" : "cloud";
+  const ok = T[it.kind][other].length && !((check(it, other, (T[it.kind][other].find((o) => o[2] === outOf(it, m, it.sel.value)) || T[it.kind][other][0])[0]) || {}).block);
+  showFix(it, ok && other);
+  updateBar();
+}
+function finish(it, href, name, size, note) {
+  it.state = "done"; it.el.classList.remove("busy"); it.el.classList.add("done");
+  setP(it, 1, note || "Done.");
+  if (size && !note) $(".num", it.el).textContent = fmtSize(it.file.size) + " → " + fmtSize(size);
+  const a = document.createElement("a"); a.className = "btn primary small dl"; a.href = href; a.download = name; a.textContent = "Download";
+  const again = document.createElement("button"); again.className = "btn ghost small"; again.textContent = "Another format";
+  again.onclick = () => { it.state = "idle"; it.el.classList.remove("done"); $(".actions", it.el).replaceChildren(...actionsOf(it)); it.sel.disabled = false; setP(it, 0); refresh(it); const c = $(".chip[aria-checked=true]", it.el); if (c) c.focus(); };
+  $(".actions", it.el).replaceChildren(again, a, $(".x", it.el));
+  updateBar(); scatter(a);
+}
+const options = () => ({ quality: Math.min(100, Math.max(1, +$("#quality").value || 85)), width: +$("#width").value || 0, mute: $("#mute").checked });
+const pct = (p) => Math.round(p * 100) + "%";
 
 function xhr(method, url, body, onProgress, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -347,39 +600,81 @@ function xhr(method, url, body, onProgress, headers = {}) {
     for (const [k, v] of Object.entries(headers)) x.setRequestHeader(k, v);
     x.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
     x.onload = () => resolve(x);
-    x.onerror = () => reject(new Error("Netzwerkfehler beim Upload"));
+    x.onerror = () => reject(E("The upload dropped. Check your connection and try again."));
     x.send(body);
   });
 }
 
 async function convertImage(it, fmt) {
   const o = options();
-  const q = new URLSearchParams({ format: fmt, quality: o.quality, name: it.file.name });
+  const q = new URLSearchParams({ format: fmt, quality: o.quality });
   if (o.width) q.set("width", o.width);
-  const x = new XMLHttpRequest();
-  x.open("POST", "/api/image?" + q);
-  x.responseType = "blob";
-  x.upload.onprogress = (e) => e.lengthComputable && setP(it, (e.loaded / e.total) * 0.7, "upload " + pct(e.loaded / e.total));
-  x.upload.onload = () => setP(it, 0.8, "wandle um …");
-  await new Promise((res, rej) => { x.onload = res; x.onerror = () => rej(new Error("Netzwerkfehler")); x.send(it.file); });
-  if (x.status !== 200) { let j = {}; try { j = JSON.parse(await x.response.text()); } catch {} throw new Error(j.error || "Fehler " + x.status); }
+  const send = async (fresh) => {
+    setP(it, 0.01, "Checking you're human …");
+    const token = await imageSession(fresh);
+    const x = new XMLHttpRequest();
+    x.open("POST", "/api/image?" + q);
+    x.setRequestHeader("x-convert-session", token);
+    x.responseType = "blob";
+    x.upload.onprogress = (e) => e.lengthComputable && setP(it, (e.loaded / e.total) * 0.7, "Uploading " + pct(e.loaded / e.total));
+    x.upload.onload = () => setP(it, 0.8, "Converting …");
+    await new Promise((res, rej) => { x.onload = res; x.onerror = () => rej(E("The upload dropped. Check your connection and try again.")); x.send(it.file); });
+    let j = {};
+    if (x.status !== 200) try { j = JSON.parse(await x.response.text()); } catch {}
+    return { x, j };
+  };
+  let { x, j } = await send(false);
+  if (x.status === 401 && j.code === "session") ({ x, j } = await send(true));
+  if (x.status !== 200) throw E(j.error || "Something went wrong. Try again in a moment.", j.detail || "HTTP " + x.status);
   const name = it.file.name.replace(/\.[^.]+$/, "") + "." + (fmt === "jpeg" ? "jpg" : fmt);
   finish(it, URL.createObjectURL(x.response), name, x.response.size);
 }
 
-// Turnstile: one fresh token per cloud video job.
-let tsWidget = null, tsWaiters = [];
-function turnstileToken() {
+// Images ride on a short session: one bot check, then a key that is good for 20 minutes.
+let sess = null;
+function imageSession(fresh) {
+  if (fresh || !sess || (sess.exp && sess.exp < Date.now() / 1000 + 60)) {
+    const s = { exp: 0 };
+    s.p = serialToken().then(async (t) => {
+      const r = await fetch("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ turnstile: t }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw E(j.error || "The bot check failed. Reload the page and try again.", j.detail || "HTTP " + r.status);
+      s.exp = j.expires;
+      return j.token;
+    });
+    s.p.catch(() => { if (sess === s) sess = null; });
+    sess = s;
+  }
+  return sess.p;
+}
+
+// Turnstile loads only once something is converted on Cloudflare, never on page view.
+let tsLoad = null;
+const loadTurnstile = () => tsLoad || (tsLoad = new Promise((resolve, reject) => {
+  const sc = document.createElement("script");
+  sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+  sc.async = true;
+  sc.onload = resolve;
+  sc.onerror = () => { tsLoad = null; sc.remove(); reject(E("The bot check didn't load. An ad blocker might be blocking challenges.cloudflare.com.")); };
+  document.head.appendChild(sc);
+}));
+
+// Turnstile: one fresh token per cloud video job or image session. The widget sits in the options bar
+// and only shows up when Cloudflare wants an interaction.
+let tsWidget = null, tsWaiters = [], tsReject = null;
+async function turnstileToken() {
+  await loadTurnstile();
   return new Promise((resolve, reject) => {
     const start = () => {
-      tsWaiters.push(resolve);
+      tsWaiters.push(resolve); tsReject = reject;
       if (tsWidget === null) {
-        tsWidget = turnstile.render("#ts", { sitekey: SITEKEY, theme: "light", size: "flexible", appearance: "interaction-only",
+        tsWidget = turnstile.render("#ts", { sitekey: SITEKEY, action: "convert", theme: "light", size: "flexible", appearance: "interaction-only",
           callback: (t) => { const w = tsWaiters.shift(); w && w(t); },
-          "error-callback": () => reject(new Error("Bot-Check fehlgeschlagen")) });
+          "before-interactive-callback": () => $("#ts").scrollIntoView({ block: "center", behavior: "smooth" }),
+          "error-callback": () => tsReject && tsReject(E("The bot check failed. Reload the page and try again.")) });
       } else turnstile.reset(tsWidget);
     };
-    if (window.turnstile) start(); else { let n = 0; const iv = setInterval(() => { if (window.turnstile) { clearInterval(iv); start(); } else if (++n > 100) { clearInterval(iv); reject(new Error("Bot-Check nicht geladen")); } }, 100); }
+    if (window.turnstile) start(); else { let n = 0; const iv = setInterval(() => { if (window.turnstile) { clearInterval(iv); start(); } else if (++n > 100) { clearInterval(iv); reject(E("The bot check didn't load. An ad blocker might be blocking challenges.cloudflare.com.")); } }, 100); }
   });
 }
 let tsChain = Promise.resolve();
@@ -387,65 +682,73 @@ const serialToken = () => (tsChain = tsChain.then(turnstileToken, turnstileToken
 
 async function convertVideoCloud(it, target) {
   const o = options();
-  setP(it, 0.01, "prüfe …");
+  setP(it, 0.01, "Checking you're human …");
   const token = await serialToken();
   const r = await fetch("/api/jobs", { method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ name: it.file.name, size: it.file.size, type: it.file.type, target, width: o.width, mute: o.mute, turnstile: token }) });
   const job = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(job.error || "Fehler " + r.status);
+  if (!r.ok) throw E(job.error || "Something went wrong. Try again in a moment.", job.detail || "HTTP " + r.status);
   const up = job.upload;
-  const onUp = (p) => setP(it, p * 0.4, "upload " + pct(p));
+  const onUp = (p) => setP(it, p * 0.4, "Uploading " + pct(p));
   let res;
   if (up.method === "PUT") res = await xhr("PUT", up.url, it.file, onUp, { "content-type": it.file.type || "video/mp4" });
   else { const fd = new FormData(); fd.append(up.field, it.file); res = await xhr("POST", up.url, fd, onUp); }
-  if (res.status >= 300) throw new Error("Upload fehlgeschlagen (" + res.status + ")");
-  if (up.then) { const s = await fetch(up.then, { method: "POST" }); if (!s.ok) throw new Error("Start fehlgeschlagen"); }
+  if (res.status >= 300) throw E(`Upload failed (${res.status}). Try again in a minute.`);
+  if (up.then) { const s = await fetch(up.then, { method: "POST" }); if (!s.ok) throw E("Cloudflare didn't take the job. Try again, or pick an in-browser format.", "HTTP " + s.status); }
+  const until = Date.now() + 15 * 60 * 1000;
   for (;;) {
     await new Promise((r) => setTimeout(r, 2000));
-    const s = await (await fetch("/api/jobs/" + job.id)).json();
-    if (s.status === "error") throw new Error(s.error || "Fehler");
-    setP(it, 0.4 + (s.progress / 100) * 0.6, (s.step || s.status).toLowerCase() + " · " + s.progress + " %");
-    if (s.status === "done") return finish(it, s.download, s.outputName, s.outputSize);
+    if (Date.now() > until) throw E("This is taking longer than it should. Try again in a few minutes, or convert it in your browser.");
+    const s = await (await fetch("/api/jobs/" + job.id, { cache: "no-store" })).json();
+    if (s.status === "error") throw E(s.error || "Something went wrong. Try again in a moment.", s.detail);
+    setP(it, 0.4 + (s.progress / 100) * 0.6, (s.step || "Working") + " · " + s.progress + "%");
+    if (s.status === "done") { loadQuota(); return finish(it, s.download, s.outputName, s.outputSize, "Done. The download stays here for 24 hours."); }
   }
 }
 
 let ffw = null, ffq = Promise.resolve();
 function convertLocal(it, target) {
   const spec = LOCAL[target];
+  setP(it, 0.01, "Waiting for the browser");
   const run = () => new Promise((resolve, reject) => {
     ffw = ffw || new Worker("/ffworker.js");
     const outName = "out." + spec.ext;
     ffw.onmessage = ({ data }) => {
       if (data.type === "status") setP(it, 0.02, data.status);
-      else if (data.type === "progress") setP(it, data.progress, "lokal · " + pct(data.progress));
+      else if (data.type === "progress") setP(it, data.progress, "In your browser · " + pct(data.progress));
       else if (data.type === "done") {
         const blob = new Blob([data.data], { type: spec.type });
         finish(it, URL.createObjectURL(blob), it.file.name.replace(/\.[^.]+$/, "") + "." + spec.ext, blob.size); resolve();
-      } else if (data.type === "error") { reject(new Error(data.error)); }
+      } else if (data.type === "error") reject(E("Something went wrong. Try again in a moment.", data.error));
     };
-    ffw.onerror = (e) => { ffw = null; reject(new Error(e.message || "Worker-Fehler (zu wenig Speicher?)")); };
+    ffw.onerror = (e) => { ffw = null; reject(E("Your browser ran out of memory. Try a smaller file or a lower max width.", e.message)); };
     ffw.postMessage({ id: 1, file: it.file, args: spec.args(options()), outName });
   });
   return (ffq = ffq.then(run, run)); // ffmpeg.wasm runs one job at a time
 }
 
 async function convert(it) {
-  if (it.state === "busy" || it.state === "done") return;
-  it.state = "busy"; it.el.classList.remove("err"); it.el.classList.add("busy"); it.sel.disabled = true; updateBusy();
-  const target = it.sel.value, where = it.sel.selectedOptions[0].dataset.where;
+  if (!canGo(it)) return;
+  it.state = "busy"; it.el.classList.remove("err", "blocked"); it.el.classList.add("busy"); it.sel.disabled = true; showFix(it, null); updateBar();
+  const target = it.sel.value, m = modeOf(it);
   try {
-    if (where === "local") await convertLocal(it, target);
+    if (m === "local") await convertLocal(it, target);
     else if (it.kind === "image") await convertImage(it, target);
     else await convertVideoCloud(it, target);
-  } catch (e) { fail(it, e.message || String(e)); it.sel.disabled = false; }
+  } catch (e) { fail(it, e, m); }
 }
 
 $("#go").onclick = async () => {
-  const todo = items.filter((i) => i.state !== "done" && i.state !== "busy");
+  const todo = items.filter(canGo);
   const pool = 3; let idx = 0;
   await Promise.all(Array.from({ length: pool }, async () => { while (idx < todo.length) await convert(todo[idx++]); }));
 };
-$("#clear").onclick = () => { for (const it of [...items]) if (it.state !== "busy") { it.el.remove(); items.splice(items.indexOf(it), 1); } $("#bar").hidden = !items.length; };
+$("#clear").onclick = () => { for (const it of [...items]) if (it.state !== "busy") { it.el.remove(); items.splice(items.indexOf(it), 1); } updateBar(); };
+$("#all").onclick = () => items.filter((i) => i.state === "done").forEach((it, i) => setTimeout(() => $(".dl", it.el).click(), i * 400));
+document.querySelectorAll("input[name=mode]").forEach((r) => r.onchange = () => {
+  globalMode = r.value;
+  for (const it of items) if (it.kind && it.state !== "busy" && it.state !== "done") { it.mode = null; it.state = "idle"; fill(it); refresh(it); }
+});
 const drop = $("#drop"), input = $("#file");
 drop.onclick = () => input.click();
 drop.onkeydown = (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), input.click());
@@ -453,7 +756,8 @@ input.onchange = () => { addFiles(input.files); input.value = ""; };
 drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
 drop.ondragleave = () => drop.classList.remove("over");
 drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); };
-document.addEventListener("paste", (e) => addFiles([...e.clipboardData.files]));
+document.addEventListener("paste", (e) => e.clipboardData.files.length && addFiles([...e.clipboardData.files]));
+addEventListener("beforeunload", (e) => { if (items.some((i) => i.state === "busy")) { e.preventDefault(); e.returnValue = ""; } });
 </script>
 </body>
 </html>
