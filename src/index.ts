@@ -249,7 +249,7 @@ export class ConvertJob extends WorkflowEntrypoint<Env, { id: string }> {
             const state = d.status?.state;
             if (state === "error") throw new Error("Stream: " + (d.status!.errorReasonText || "encoding failed"));
             if (d.duration! > LIMITS.maxDurationSeconds) throw new Error("too-long: " + d.duration);
-            const pct = parseFloat(d.status?.pctComplete || "0") || 0;
+            const pct = Number.parseFloat(d.status?.pctComplete || "0") || 0;
             await updateJob(env, id, { status: "processing", progress: Math.round(10 + pct * 0.5), step: "Cloudflare is encoding" });
             return !!d.readyToStream;
           });
@@ -362,7 +362,7 @@ async function handleImage(req: Request, env: Env, url: URL, ctx: ExecutionConte
     if (width > 0) t = t.transform({ width: Math.min(width, IMAGE_SIDE), fit: "scale-down" });
     const out = await t.output({ format: IMAGE_FORMATS[format], quality, anim: format === "webp" ? undefined : false });
     const name = "image." + (format === "jpeg" ? "jpg" : format);
-    phCapture(env, ctx, "image_converted", { format, resized: width > 0 });
+    void phCapture(env, ctx, "image_converted", { format, resized: width > 0 });
     return out.response({
       headers: { ...FILE_HEADERS, "content-type": IMAGE_FORMATS[format], "content-disposition": `attachment; filename="${name}"` },
     });
@@ -414,7 +414,7 @@ async function createJob(req: Request, env: Env, url: URL, ctx: ExecutionContext
   await env.DB.prepare(
     "INSERT INTO jobs (id, kind, engine, status, progress, step, input_name, input_key, stream_uid, options, ip_hash, created_at, updated_at) VALUES (?1, 'video', ?2, 'uploading', 0, 'Uploading', ?3, ?4, ?5, ?6, ?7, ?8, ?8)"
   ).bind(id, engine, String(name || "video").slice(0, 200), `in/${id}`, streamUid, options, ip, now()).run();
-  phCapture(env, ctx, "video_job_created", { engine, target });
+  void phCapture(env, ctx, "video_job_created", { engine, target });
   return json({ id, engine, upload });
 }
 
@@ -772,7 +772,7 @@ export default {
       res = await route(req, env, ctx);
     } catch (e) {
       console.error(e);
-      phException(env, ctx, e, { where: "fetch" });
+      void phException(env, ctx, e, { where: "fetch" });
       res = err("Something went wrong. Try again in a moment.", 500);
     }
     if (env.POSTHOG_LOGS) console.log(requestLine(req, res.status, Date.now() - started));
