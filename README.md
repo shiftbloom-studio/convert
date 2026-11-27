@@ -108,7 +108,7 @@ convert.shiftbloom.studio deploys with Workers Builds on every push to `main`, a
 
 ### Logs in PostHog
 
-Workers Logs can be exported over OpenTelemetry without code changes. Create a logs destination under Workers & Pages > Observability > Destinations with the URL `https://eu.i.posthog.com/i/v1/logs` (or `us.i.posthog.com`) and the header `Authorization: Bearer <your PostHog project token>`, then add it to the Worker's config:
+Workers Logs can be exported over OpenTelemetry without code changes. Create a logs destination under Workers & Pages > Observability > Destinations with the URL `https://us.i.posthog.com/i/v1/logs` (or `eu.i.posthog.com`), matching the region of `POSTHOG_HOST`, and the header `Authorization: Bearer <your PostHog project token>`, then add it to the Worker's config:
 
 ```jsonc
 "observability": { "enabled": true, "redact_query_string": true, "logs": { "enabled": true, "invocation_logs": false, "destinations": ["<your-destination-name>"] } }
@@ -116,7 +116,7 @@ Workers Logs can be exported over OpenTelemetry without code changes. Create a l
 
 Keep `invocation_logs` off: Cloudflare's invocation logs contain the full request URL, and a job's URL is the link to its result. With `POSTHOG_LOGS` set, convert writes its own line per request instead (method, path with job IDs masked, target format, quality and width, status, duration, IP, country, user agent, language, content type and length) and one line per finished conversion (engine, target format, duration).
 
-Set the var `POSTHOG_LOGS` to `eu` or `us` so the privacy policy names PostHog and where it stores the logs.
+Set the var `POSTHOG_LOGS` to `us` or `eu` (the same region as the destination) so the privacy policy names PostHog and where it stores the logs.
 
 ### Usage statistics with PostHog (optional)
 
