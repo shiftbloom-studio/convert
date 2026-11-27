@@ -242,7 +242,7 @@ __POSTHOG__
     <span class="btn primary pick">Choose files</span>
     <div class="formats"><span class="label">opens</span><span class="fmts">png jpg webp avif heic mp4 mov webm mkv mp3 wav flac</span></div>
     <p class="limits">on cloudflare: images up to 20 mb, video up to 200 mb and 10 min. in-browser formats are limited by your device's memory.</p>
-    <input type="file" id="file" multiple hidden accept="image/*,video/*,audio/*,.mkv,.mov,.heic,.heif">
+    <input type="file" id="file" aria-label="Choose files" multiple hidden accept="image/*,video/*,audio/*,.mkv,.mov,.heic,.heif">
   </div>
 
   <div class="list" id="list"></div>
@@ -552,7 +552,7 @@ function readDuration(it) {
   const v = document.createElement("video");
   v.preload = "metadata"; v.muted = true;
   const done = () => { URL.revokeObjectURL(url); v.removeAttribute("src"); };
-  v.onloadedmetadata = () => { if (isFinite(v.duration)) { it.duration = v.duration; refresh(it); } done(); };
+  v.onloadedmetadata = () => { if (Number.isFinite(v.duration)) { it.duration = v.duration; refresh(it); } done(); };
   v.onerror = done; v.src = url;
 }
 

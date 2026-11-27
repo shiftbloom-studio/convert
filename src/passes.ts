@@ -20,7 +20,7 @@ const enc = (s: string) => new TextEncoder().encode(s);
 export const b64u = (b: Uint8Array) => {
   let s = "";
   for (const x of b) s += String.fromCharCode(x);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/={1,2}$/, "");
 };
 export const unb64u = (s: unknown) => {
   if (typeof s !== "string" || !/^[A-Za-z0-9_-]*$/.test(s)) throw new Error("not base64url");

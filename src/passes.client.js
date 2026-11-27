@@ -8,12 +8,12 @@
 (() => {
   const STORE = "convert.passes.v1";
   const enc = (s) => new TextEncoder().encode(s);
-  const b64u = (b) => { let s = ""; for (const x of b) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+  const b64u = (b) => { let s = ""; for (const x of b) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/={1,2}$/, ""); };
   const unb64u = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
   const digest = async (alg, b) => new Uint8Array(await crypto.subtle.digest(alg, b));
   const cat = (...p) => { const o = new Uint8Array(p.reduce((n, x) => n + x.length, 0)); let i = 0; for (const x of p) { o.set(x, i); i += x.length; } return o; };
   const toInt = (b) => { let h = ""; for (const x of b) h += x.toString(16).padStart(2, "0"); return BigInt("0x" + (h || "0")); };
-  const toBytes = (n, len) => { const h = n.toString(16).padStart(len * 2, "0"); const o = new Uint8Array(len); for (let i = 0; i < len; i++) o[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16); return o; };
+  const toBytes = (n, len) => { const h = n.toString(16).padStart(len * 2, "0"); const o = new Uint8Array(len); for (let i = 0; i < len; i++) o[i] = Number.parseInt(h.slice(i * 2, i * 2 + 2), 16); return o; };
   const modPow = (b, e, m) => { let r = 1n; b %= m; while (e > 0n) { if (e & 1n) r = (r * b) % m; b = (b * b) % m; e >>= 1n; } return r; };
   const modInv = (a, m) => { let [r0, r1, s0, s1] = [m, a % m, 0n, 1n]; while (r1) { const q = r0 / r1; [r0, r1] = [r1, r0 - q * r1]; [s0, s1] = [s1, s0 - q * s1]; } if (r0 !== 1n) throw new Error("not invertible"); return ((s0 % m) + m) % m; };
 
